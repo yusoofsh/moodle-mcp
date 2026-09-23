@@ -30,3 +30,18 @@ Date: 2026-09-23. Baseline: `96b6fb1a4f3e942fbf9706870e1a39a276cda008` on the ex
 8. Multi-user isolation, multiple Moodle accounts, multiple replicas and external database support are outside the single-owner design.
 
 No Moodle write tools are introduced. Adding them requires separate scopes, explicit server-side policy, tests and a new review.
+
+## Password-login increment — 0.4.0
+
+Baseline: `c1a286f4b9cf6fbad474d3a22e5ae61d1e0d32d2`, on `master`. This change addresses local owner sign-in, not the Moodle feature backlog above.
+
+| Priority | Finding                                                                   | Resolution                                                                                                                              |
+| -------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| P1       | GitHub OAuth App setup is unnecessary for a private password-owned bridge | Password login by default; GitHub remains explicit opt-in via AUTH_MODE=github                                                          |
+| P1       | Password authentication needs safe storage and brute-force controls       | Salted asynchronous scrypt, fixed validated cost, constant-time comparison, persistent IP/global budgets and one in-flight verification |
+| P1       | Login forms must not bypass OAuth identity, PKCE or consent               | Interaction-bound one-use CSRF nonces, exact Origin checks, existing provider and consent retained                                      |
+| P1       | Password changes should invalidate existing authorization                 | Hash-bound internal owner identity; restart/rotation regression tests cover access tokens, refresh tokens and browser sessions          |
+| P2       | Hash setup should not expose passwords in process arguments/history       | Hidden terminal helper with confirmation, explicit bounded stdin mode, Compose-safe hash encoding                                       |
+| P2       | Published container must work without a GitHub application                | Password-mode image smoke test generates its own test hash and checks discovery/non-root/401 behavior                                   |
+
+No live Moodle credentials, deployment origin or user password are stored in the repository. The earlier student-feature backlog remains open.

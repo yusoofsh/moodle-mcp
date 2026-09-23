@@ -8,6 +8,8 @@ import {
 import type Provider from "oidc-provider";
 import type { HttpConfig } from "./config.js";
 import type { AuthStore } from "./store.js";
+import { verifyPassword } from "./password.js";
+import { reservePasswordAttempt } from "./password-throttle.js";
 
 export type Fetcher = typeof fetch;
 const escape = (text: unknown): string =>
@@ -49,13 +51,24 @@ export function interactionRouter(
     path: "/",
     maxAge: 600000,
   };
+  let passwordCheckInFlight = false;
+  const passwordForm = (uid: string, invalid = false): string => {
+    const nonce = randomBytes(32).toString("base64url");
+    store.put("PasswordForm", nonce, { uid }, 600);
+    return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Sign in to Moodle MCP</title><body><main><h1>Sign in to Moodle MCP</h1><p>Enter this server's owner password. This is not your Moodle password.</p>${invalid ? '<p role="alert">Incorrect password. Try again.</p>' : ""}<form method="post" action="/interaction/password"><input type="hidden" name="csrf" value="${nonce}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="1024"><button type="submit">Continue</button></form><p>You will review access permissions before authorizing the MCP client.</p></main></body></html>`;
+  };
   const csrf = (uid: string): string =>
     createHmac("sha256", config.authSecret)
       .update("consent:" + uid)
       .digest("hex");
   router.get("/interaction", async (req, res) => {
     const details = await provider.interactionDetails(req, res);
+    res.setHeader("Cache-Control", "no-store");
     if (details.prompt.name === "login") {
+      if (config.authMode === "password") {
+        res.type("html").send(passwordForm(details.uid));
+        return;
+      }
       const state = randomBytes(32).toString("base64url"),
         verifier = randomBytes(32).toString("base64url");
       store.put("GithubState", state, { uid: details.uid, verifier }, 600);
@@ -88,7 +101,91 @@ export function interactionRouter(
         `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Authorize Moodle MCP</title><body><main><h1>Authorize Moodle MCP</h1><p><strong>${escape(client?.clientName || client?.clientId || "MCP client")}</strong> requests read-only access to your configured Moodle account.</p><p>This includes courses, files, assignments, grades, calendar, quizzes, forums and notifications. It cannot submit work or change grades.</p><p>Client ID: <code>${escape(client?.clientId)}</code></p><p>Redirect URI: <code>${escape(details.params.redirect_uri)}</code></p><form method="post" action="/interaction/confirm"><input type="hidden" name="csrf" value="${csrf(details.uid)}"><button name="decision" value="allow">Allow read-only access</button><button name="decision" value="deny">Deny</button></form></main></body></html>`,
       );
   });
+  router.post(
+    "/interaction/password",
+    urlencoded({ extended: false, limit: "8kb", parameterLimit: 4 }),
+    async (req, res) => {
+      res.setHeader("Cache-Control", "no-store");
+      if (config.authMode !== "password") {
+        res.status(404).send("Not found");
+        return;
+      }
+      const password: unknown = req.body?.password;
+      if (req.body && typeof req.body === "object") delete req.body.password;
+      if (
+        req.get("origin") !== config.publicUrl ||
+        !req.is("application/x-www-form-urlencoded")
+      ) {
+        res.status(403).send("Invalid login request");
+        return;
+      }
+      const details = await provider
+        .interactionDetails(req, res)
+        .catch(() => undefined);
+      if (!details) {
+        res
+          .status(400)
+          .send("Login session unavailable; start the connection again");
+        return;
+      }
+      if (
+        details.prompt.name !== "login" ||
+        typeof req.body?.csrf !== "string" ||
+        !/^[A-Za-z0-9_-]{43}$/.test(req.body.csrf)
+      ) {
+        res.status(403).send("Invalid login request");
+        return;
+      }
+      const pending = store.take("PasswordForm", req.body.csrf);
+      if (!pending || pending.uid !== details.uid) {
+        res
+          .status(403)
+          .send("Expired or mismatched login form; restart sign-in");
+        return;
+      }
+      if (passwordCheckInFlight) {
+        res
+          .status(429)
+          .set("Retry-After", "1")
+          .send("Login is busy; reload and try again");
+        return;
+      }
+      const retry = reservePasswordAttempt(
+        store,
+        config.authSecret,
+        req.ip || "unknown",
+      );
+      if (retry) {
+        res
+          .status(429)
+          .set("Retry-After", String(retry))
+          .send("Too many login attempts; try again later");
+        return;
+      }
+      passwordCheckInFlight = true;
+      // Remove the submitted password from req.body before other middleware could
+      // observe it. Never include it in state, logs, errors or OAuth credentials.
+      try {
+        if (!(await verifyPassword(password, config.passwordHash))) {
+          res.status(401).type("html").send(passwordForm(details.uid, true));
+          return;
+        }
+        await provider.interactionFinished(
+          req,
+          res,
+          { login: { accountId: config.ownerId } },
+          { mergeWithLastSubmission: false },
+        );
+      } finally {
+        passwordCheckInFlight = false;
+      }
+    },
+  );
   router.get("/interaction/github/callback", async (req, res) => {
+    if (config.authMode !== "github") {
+      res.status(404).send("Not found");
+      return;
+    }
     const { state, code } = req.query;
     if (
       typeof state !== "string" ||

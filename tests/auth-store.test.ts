@@ -70,6 +70,7 @@ describe("persistent OAuth store", () => {
 describe("HTTP startup configuration", () => {
   const env = {
     PUBLIC_URL: "https://moodle-mcp.example",
+    AUTH_MODE: "github",
     GITHUB_CLIENT_ID: "id",
     GITHUB_CLIENT_SECRET: "secret",
     GITHUB_ALLOWED_USER_ID: "18055365",

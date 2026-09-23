@@ -36,10 +36,17 @@ jobs:
           if docker run --rm moodle-mcp:smoke; then
             echo 'Missing configuration must fail closed'; exit 1
           fi
+          # Exercise the password helper in the built image; no GitHub app or
+          # production credentials are used by this smoke test.
+          hash_line=$(printf '%s' 'ci-only local password phrase' | docker run --rm -i moodle-mcp:smoke node dist/auth/password-cli.js --stdin)
+          [[ "$hash_line" =~ ^AUTH_PASSWORD_HASH=scrypt:131072:8:1:[a-f0-9]{32}:[a-f0-9]{64}$ ]]
+          if printf '%s' short | docker run --rm -i moodle-mcp:smoke node dist/auth/password-cli.js --stdin; then
+            echo 'Weak password must be rejected'; exit 1
+          fi
           docker run -d --name moodle-smoke -p 127.0.0.1:3000:3000 \
             -e PUBLIC_URL=http://localhost:3000 -e ALLOW_INSECURE_HTTP=true \
-            -e GITHUB_CLIENT_ID=smoke -e GITHUB_CLIENT_SECRET=smoke \
-            -e GITHUB_ALLOWED_USER_ID=18055365 -e AUTH_SECRET="$(openssl rand -hex 32)" \
+            -e AUTH_MODE=password -e "$hash_line" \
+            -e AUTH_SECRET="$(openssl rand -hex 32)" \
             -e MOODLE_URL=https://moodle.invalid -e MOODLE_TOKEN=smoke \
             moodle-mcp:smoke
           trap 'docker logs moodle-smoke; docker rm -f moodle-smoke' EXIT
@@ -83,7 +90,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/yusoofsh/moodle-mcp
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=0.3.0
+            org.opencontainers.image.version=0.4.0
             org.opencontainers.image.licenses=MIT
           provenance: mode=max
           sbom: true

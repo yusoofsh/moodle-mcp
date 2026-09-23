@@ -1,6 +1,6 @@
 # Security model
 
-This is a **single-owner read-only bridge**, not a public multi-tenant Moodle service. The allowlisted GitHub owner authorizes MCP clients to use one Moodle account configured on the server.
+This is a **single-owner read-only bridge**, not a public multi-tenant Moodle service. The password-authenticated owner (or explicitly selected allowlisted GitHub owner) authorizes MCP clients to use one Moodle account configured on the server.
 
 ## Deployment requirements
 
@@ -27,3 +27,15 @@ Course content is untrusted input. Its text must not be treated as instructions 
 On suspected compromise, revoke the relevant OAuth credentials and rotate the Moodle token as appropriate. Stopping the service, replacing the authentication secret and reinitializing its auth database invalidates all MCP client sessions but requires reauthorization; do not erase persistent data during routine updates. Back up first when recovery is intended.
 
 Report suspected vulnerabilities privately to the repository owner rather than publishing credentials or exploit data in public issues. A successful test suite or dependency audit is not an independent security assessment.
+
+## Local password authentication (0.4.0)
+
+Password mode is the default and requires `AUTH_PASSWORD_HASH`; there is no plaintext-password fallback or default password. The password authenticates the owner on the OAuth authorization page only. It is not HTTP Basic authentication, the OAuth password grant, or a static bearer token. `/mcp` continues to require OAuth credentials.
+
+The helper uses Node's asynchronous scrypt with a 16-byte random salt, 32-byte output, `N=131072`, `r=8`, `p=1`, and a fixed 160 MiB maximum allocation allowance. Encoded parameters are strictly validated on startup, and key comparisons use `timingSafeEqual`. A single in-flight verification caps memory pressure. Login form nonces are one-use, stored server-side, bound to the current OAuth interaction and protected by an exact Origin check. A password alone does not bypass the separate consent step.
+
+Password attempt budgets persist in SQLite: five per IP and thirty globally in fixed 15-minute windows, including successful attempts. Addresses are HMAC-derived before use as counter identifiers. Restarting does not reset the budget. Rate limiting can temporarily deny legitimate sign-in during abuse; edge controls remain necessary. Do not run multiple application replicas with this design.
+
+The internal password-owner identity is bound to the configured hash and AUTH_SECRET. On hash rotation and container recreation, previously issued access and refresh tokens and browser sessions cease to authorize the current owner. Unchanged hashes and storage preserve ordinary restart behavior. Keep the existing AUTH_SECRET and volume during password rotation; do not erase the database. Hashes remain sensitive offline-cracking targets and must not be committed or logged. Password entry intentionally has no MFA; use a strong unique passphrase.
+
+References: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [Node crypto.scrypt](https://nodejs.org/api/crypto.html#cryptoscryptpassword-salt-keylen-options-callback).

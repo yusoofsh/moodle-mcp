@@ -135,7 +135,7 @@ export function createApp(
   };
   app.post("/mcp", express.json({ limit: "1mb" }), async (req, res) => {
     const client = await getClient();
-    const server = new McpServer({ name: "moodle-mcp", version: "0.3.0" });
+    const server = new McpServer({ name: "moodle-mcp", version: "0.4.0" });
     registerAllTools(server, client);
     registerResources(server, client);
     registerPrompts(server);

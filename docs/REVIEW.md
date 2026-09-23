@@ -28,3 +28,17 @@ The final Actions run is the source of truth for container build, container smok
 ## Remaining acceptance limitations
 
 No production Moodle credential, GitHub OAuth App credential or public deployment hostname was supplied. Therefore live account sign-in, actual Moodle data retrieval, HTTPS proxy configuration and the ChatGPT connection must be validated after configuration. GitHub test responses are simulated, not a live login. The current database adapter is intended for one process/replica. CIMD, full Moodle coverage and general-purpose binary text extraction are not implemented.
+
+## Password increment review — 0.4.0
+
+Reviewed against `c1a286f4b9cf6fbad474d3a22e5ae61d1e0d32d2`. Kept the existing TypeScript SDK v2, Express, oidc-provider and SQLite implementation. No authentication framework migration or Moodle write tools.
+
+- Password mode defaults on; missing/malformed hashes fail closed. GitHub requires explicit AUTH_MODE=github, preserving the code path rather than silently falling back.
+- Salted scrypt uses Node crypto, no additional runtime package. Fixed parameters prevent a tampered hash from selecting an unbounded work factor. Local passwords are never OAuth bearer credentials.
+- Login nonces are atomically consumed and bound to provider interaction cookies. CSRF, foreign Origin, duplicate/malformed fields, replay and oversized bodies are tested. Consent remains separate.
+- SQLite-backed IP/global attempt limits survive restarts. One in-flight verification caps hash memory. Global throttling can temporarily block legitimate sign-in; this tradeoff is documented.
+- A real-provider regression restarts against the same database and proves unchanged-hash token persistence, then verifies old access, refresh and browser sessions are rejected after hash rotation.
+- The hidden-prompt helper was exercised through a pseudo-terminal: both prompts appeared and the test password was not echoed. Stdin mode, too-short and oversized inputs, missing TTY and invalid argument failures were also exercised.
+- The expanded suite contains 92 tests, including the retained GitHub OAuth tests. Final CI is the source of truth for the full suite, type/build checks, dependency audit, container smoke checks and registry publication.
+
+This is an implementation self-review, not an independent audit. The public HTTPS endpoint and actual ChatGPT/Moodle accounts still require live acceptance after deployment; no user password was requested or generated for deployment.

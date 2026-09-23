@@ -1,3 +1,11 @@
+## 0.4.0 — 2026-09-23
+
+- Add local password owner login inside the existing OAuth/PKCE and consent flow.
+- Default to AUTH_MODE=password; existing GitHub users must set AUTH_MODE=github explicitly.
+- Add a hidden-prompt password-hash helper, fixed-cost salted scrypt, persistent login attempt limits, and a single-verification concurrency guard.
+- Invalidate old OAuth/browser sessions when the configured password hash changes, without deleting persistent data.
+- Publish password-mode-tested amd64/arm64 OCI images through the existing GHCR pipeline.
+
 # Changelog
 
 ## [0.1.0] — 2026-04-15

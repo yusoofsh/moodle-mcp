@@ -1,12 +1,30 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import request from "supertest";
 import { createHash, randomBytes } from "node:crypto";
 import { createApp } from "../src/app.js";
 import { getHttpConfig } from "../src/auth/config.js";
 import { MoodleClient } from "../src/moodle-client.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { hashPassword } from "../src/auth/password.js";
+const password = "a private Moodle passphrase";
+let passwordHash: string;
+beforeAll(async () => {
+  passwordHash = await hashPassword(password);
+});
 const origin = "http://localhost:3000",
   host = "localhost:3000",
   callback = "https://chatgpt.com/connector_platform_oauth_redirect";
+let rotationDir: string | undefined;
 let runtime: ReturnType<typeof createApp>;
 let github: ReturnType<typeof vi.fn>;
 let moodle: ReturnType<typeof vi.fn>;
@@ -53,17 +71,20 @@ beforeEach(() => {
     getHttpConfig({
       PUBLIC_URL: origin,
       ALLOW_INSECURE_HTTP: "true",
-      AUTH_MODE: "github",
-      GITHUB_CLIENT_ID: "github-id",
-      GITHUB_CLIENT_SECRET: "github-secret",
-      GITHUB_ALLOWED_USER_ID: "18055365",
+      AUTH_PASSWORD_HASH: passwordHash,
       AUTH_SECRET: "a".repeat(64),
       OAUTH_DATABASE_PATH: ":memory:",
     }),
     { githubFetch: github, createMoodleClient: moodle },
   );
 });
-afterEach(() => runtime.close());
+afterEach(() => {
+  runtime.close();
+  if (rotationDir) {
+    rmSync(rotationDir, { recursive: true, force: true });
+    rotationDir = undefined;
+  }
+});
 async function register() {
   const response = await request(runtime.app)
     .post("/oauth/register")
@@ -97,31 +118,45 @@ async function begin(clientId: string, extra: Record<string, string> = {}) {
     });
   expect(response.status, response.text).toBe(303);
   response = await agent.get(path(response.headers.location)).set("Host", host);
-  expect(response.status, response.text).toBe(302);
+  expect(response.status, response.text).toBe(200);
+  expect(response.text).toContain('type="password"');
+  expect(response.headers["cache-control"]).toBe("no-store");
   return {
     agent,
     verifier,
-    state: new URL(response.headers.location).searchParams.get("state")!,
+    state: /name="csrf" value="([^"]+)"/.exec(response.text)![1],
   };
 }
 async function consent(clientId: string) {
   const flow = await begin(clientId);
   let response = await flow.agent
-    .get("/interaction/github/callback")
+    .post("/interaction/password")
     .set("Host", host)
-    .query({ state: flow.state, code: "valid-code" });
+    .set("Origin", origin)
+    .type("form")
+    .send({ csrf: flow.state, password });
   expect(response.status, response.text).toBe(303);
+  const sessionCookies = new Map<string, string>();
+  const remember = (response: { headers: Record<string, any> }) => {
+    for (const value of response.headers["set-cookie"] || []) {
+      const cookie = value.split(";")[0];
+      if (cookie.startsWith("_session"))
+        sessionCookies.set(cookie.split("=")[0], cookie);
+    }
+  };
+  remember(response);
   // Resume authorization and reach the explicit consent screen.
   for (let i = 0; i < 5 && response.headers.location; i++) {
     expect(new URL(response.headers.location, origin).origin).toBe(origin);
     response = await flow.agent
       .get(path(response.headers.location))
       .set("Host", host);
+    remember(response);
   }
   expect(response.status, response.text).toBe(200);
   const csrf = /name="csrf" value="([^"]+)"/.exec(response.text)?.[1];
   expect(csrf).toBeTruthy();
-  return { ...flow, csrf: csrf! };
+  return { ...flow, csrf: csrf!, sessionCookies: [...sessionCookies.values()] };
 }
 async function authorize(clientId: string) {
   const flow = await consent(clientId);
@@ -161,7 +196,7 @@ async function exchange(clientId: string, code: string, verifier: string) {
       resource: origin + "/mcp",
     });
 }
-describe("OAuth protected MCP", () => {
+describe("Password login with OAuth protected MCP", () => {
   it("publishes RFC 9728 metadata and OAuth discovery with PKCE S256", async () => {
     const resource = await request(runtime.app)
       .get("/.well-known/oauth-protected-resource/mcp")
@@ -213,34 +248,231 @@ describe("OAuth protected MCP", () => {
       ).status,
     ).toBe(403);
   });
-  it("rejects a forged GitHub state", async () => {
-    const id = await register(),
-      flow = await begin(id);
+  it("rejects forged login CSRF and does not contact GitHub or Moodle", async () => {
+    const flow = await begin(await register());
     const response = await flow.agent
-      .get("/interaction/github/callback")
+      .post("/interaction/password")
       .set("Host", host)
-      .query({ state: "forged", code: "code" });
-    expect(response.status).toBe(400);
+      .set("Origin", origin)
+      .type("form")
+      .send({ csrf: "forged", password });
+    expect(response.status).toBe(403);
+    expect(github).not.toHaveBeenCalled();
+    expect(moodle).not.toHaveBeenCalled();
+  });
+  it("rejects incorrect passwords, never reflects them, and consumes the form nonce", async () => {
+    const flow = await begin(await register());
+    const submit = (csrf: string, value: unknown) =>
+      flow.agent
+        .post("/interaction/password")
+        .set("Host", host)
+        .set("Origin", origin)
+        .type("form")
+        .send({ csrf, password: value });
+    const response = await submit(flow.state, "a wrong secret password");
+    expect(response.status).toBe(401);
+    expect(response.text).not.toContain("a wrong secret password");
+    expect((await submit(flow.state, password)).status).toBe(403);
+    const fresh = /name="csrf" value="([^"]+)"/.exec(response.text)![1];
+    expect((await submit(fresh, password)).status).toBe(303);
+    expect(github).not.toHaveBeenCalled();
+    expect(moodle).not.toHaveBeenCalled();
+  });
+  it("requires a valid same-origin password form and bound browser session", async () => {
+    const flow = await begin(await register());
+    for (const originValue of ["https://attacker.example", ""]) {
+      const response = await flow.agent
+        .post("/interaction/password")
+        .set("Host", host)
+        .set("Origin", originValue)
+        .type("form")
+        .send({ csrf: flow.state, password });
+      expect(response.status).toBe(403);
+    }
+    const other = await begin(await register());
+    expect(
+      (
+        await other.agent
+          .post("/interaction/password")
+          .set("Host", host)
+          .set("Origin", origin)
+          .type("form")
+          .send({ csrf: flow.state, password })
+      ).status,
+    ).toBe(403);
+  });
+  it("rejects the disabled GitHub callback and HTTP Basic authentication", async () => {
+    expect(
+      (
+        await request(runtime.app)
+          .get("/interaction/github/callback")
+          .set("Host", host)
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await request(runtime.app)
+          .post("/mcp")
+          .set("Host", host)
+          .auth("owner", password)
+          .send({})
+      ).status,
+    ).toBe(401);
+    expect(github).not.toHaveBeenCalled();
+    expect(moodle).not.toHaveBeenCalled();
+  });
+  it("rejects duplicate password fields and oversized form bodies", async () => {
+    const flow = await begin(await register());
+    const bad = await flow.agent
+      .post("/interaction/password")
+      .set("Host", host)
+      .set("Origin", origin)
+      .type("form")
+      .send(`csrf=${flow.state}&password=one&password=two`);
+    expect(bad.status).toBe(401);
+    expect(
+      (
+        await flow.agent
+          .post("/interaction/password")
+          .set("Host", host)
+          .set("Origin", origin)
+          .type("form")
+          .send({ csrf: "x", password: "x".repeat(9000) })
+      ).status,
+    ).toBe(413);
+  });
+  it("persists a five-attempt budget across fresh login forms", async () => {
+    const id = await register();
+    for (let i = 0; i < 6; i++) {
+      const flow = await begin(id);
+      const response = await flow.agent
+        .post("/interaction/password")
+        .set("Host", host)
+        .set("Origin", origin)
+        .type("form")
+        .send({ csrf: flow.state, password: "wrong" });
+      expect(response.status).toBe(i < 5 ? 401 : 429);
+      if (i === 5)
+        expect(Number(response.headers["retry-after"])).toBeGreaterThan(0);
+    }
+    expect(github).not.toHaveBeenCalled();
+    expect(moodle).not.toHaveBeenCalled();
+  });
+  it("permits only one expensive password check at a time", async () => {
+    const first = await begin(await register());
+    const second = await begin(await register());
+    const responses = await Promise.all(
+      [first, second].map((flow) =>
+        flow.agent
+          .post("/interaction/password")
+          .set("Host", host)
+          .set("Origin", origin)
+          .type("form")
+          .send({ csrf: flow.state, password }),
+      ),
+    );
+    expect(responses.map((r) => r.status).sort()).toEqual([303, 429]);
+  });
+  it("keeps tokens across restart but invalidates access, refresh, and browser sessions on password rotation", async () => {
+    rotationDir = mkdtempSync(join(tmpdir(), "moodle-password-rotation-"));
+    const env = {
+      PUBLIC_URL: origin,
+      ALLOW_INSECURE_HTTP: "true",
+      AUTH_PASSWORD_HASH: passwordHash,
+      AUTH_SECRET: "a".repeat(64),
+      OAUTH_DATABASE_PATH: join(rotationDir, "auth.db"),
+    };
+    const reboot = (hash: string) => {
+      runtime.close();
+      runtime = createApp(getHttpConfig({ ...env, AUTH_PASSWORD_HASH: hash }), {
+        githubFetch: github,
+        createMoodleClient: moodle,
+      });
+    };
+    reboot(passwordHash);
+    const id = await register(),
+      flow = await authorize(id),
+      token = await exchange(id, flow.code, flow.verifier);
+    expect(token.status).toBe(200);
+    expect(flow.sessionCookies.length).toBeGreaterThan(0);
+    const invoke = () =>
+      request(runtime.app)
+        .post("/mcp")
+        .set("Host", host)
+        .set("Accept", "application/json, text/event-stream")
+        .set("Authorization", "Bearer " + token.body.access_token)
+        .send({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-11-25",
+            capabilities: {},
+            clientInfo: { name: "rotation-test", version: "1" },
+          },
+        });
+    reboot(passwordHash);
+    expect((await invoke()).status).toBe(200);
+    reboot(await hashPassword("a completely new passphrase"));
+    expect((await invoke()).status).toBe(401);
+    const refresh = await request(runtime.app)
+      .post("/oauth/token")
+      .set("Host", host)
+      .type("form")
+      .send({
+        grant_type: "refresh_token",
+        client_id: id,
+        refresh_token: token.body.refresh_token,
+        resource: origin + "/mcp",
+      });
+    expect(refresh.status).toBe(400);
+    const browser = request.agent(runtime.app);
+    let response = await browser
+      .get("/oauth/authorize")
+      .set("Host", host)
+      .set("Cookie", flow.sessionCookies)
+      .query({
+        client_id: id,
+        redirect_uri: callback,
+        response_type: "code",
+        scope: "openid offline_access moodle:read",
+        resource: origin + "/mcp",
+        state: "reconnect",
+        code_challenge: "x".repeat(43),
+        code_challenge_method: "S256",
+      });
+    for (
+      let i = 0;
+      i < 5 &&
+      response.headers.location &&
+      new URL(response.headers.location, origin).origin === origin;
+      i++
+    )
+      response = await browser
+        .get(path(response.headers.location))
+        .set("Host", host);
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('type="password"');
     expect(github).not.toHaveBeenCalled();
   });
-  it("denies another GitHub user", async () => {
-    github.mockImplementation(
-      async (url: string) =>
-        new Response(
-          JSON.stringify(
-            url.endsWith("/access_token")
-              ? { access_token: "github-token" }
-              : { id: 123 },
-          ),
-        ),
-    );
+  it("does not put the password or its hash in provider records or OAuth responses", async () => {
     const id = await register(),
-      flow = await begin(id);
-    const response = await flow.agent
-      .get("/interaction/github/callback")
-      .set("Host", host)
-      .query({ state: flow.state, code: "code" });
-    expect(response.status, response.text).toBe(403);
+      flow = await authorize(id),
+      token = await exchange(id, flow.code, flow.verifier);
+    expect(token.status).toBe(200);
+    expect(token.text).not.toContain(password);
+    expect(token.text).not.toContain(passwordHash);
+    for (const row of runtime.store.db
+      .prepare("SELECT model,id FROM oauth")
+      .all()) {
+      // Raw stored rows are encrypted, and the verifier is not persisted there.
+      expect(JSON.stringify(row)).not.toContain(passwordHash);
+    }
+    const dump = JSON.stringify(
+      runtime.store.db.prepare("SELECT * FROM oauth").all(),
+    );
+    expect(dump).not.toContain(password);
+    expect(dump).not.toContain(passwordHash);
   });
   it("requires valid CSRF and explicit consent", async () => {
     const id = await register(),
