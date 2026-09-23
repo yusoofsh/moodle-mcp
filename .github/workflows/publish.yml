@@ -27,6 +27,8 @@ jobs:
       - run: bun run check
       - run: bun run test
       - run: bun run build
+      - run: bun run workers:build
+      - run: bun run workers:test
       - run: bun audit
       - name: Build and smoke-test the container
         shell: bash
@@ -36,8 +38,7 @@ jobs:
           if docker run --rm moodle-mcp:smoke; then
             echo 'Missing configuration must fail closed'; exit 1
           fi
-          # Exercise the password helper in the built image; no GitHub app or
-          # production credentials are used by this smoke test.
+          # Only synthetic credentials are used by this smoke test.
           hash_line=$(printf '%s' 'ci-only local password phrase' | docker run --rm -i moodle-mcp:smoke node dist/auth/password-cli.js --stdin)
           [[ "$hash_line" =~ ^AUTH_PASSWORD_HASH=scrypt:131072:8:1:[a-f0-9]{32}:[a-f0-9]{64}$ ]]
           if printf '%s' short | docker run --rm -i moodle-mcp:smoke node dist/auth/password-cli.js --stdin; then
@@ -90,7 +91,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/yusoofsh/moodle-mcp
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=0.4.0
+            org.opencontainers.image.version=0.5.0
             org.opencontainers.image.licenses=MIT
           provenance: mode=max
           sbom: true
