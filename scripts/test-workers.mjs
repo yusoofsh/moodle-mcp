@@ -237,6 +237,42 @@ try {
     );
     assert.equal(calls, 0);
   });
+  await check(
+    "DCR accepts UTF-8 JSON and preserves media-type validation",
+    async () => {
+      for (const contentType of [
+        "application/json",
+        "application/json; charset=utf-8",
+      ]) {
+        const response = await client.request("/oauth/register", {
+          method: "POST",
+          headers: { "Content-Type": contentType },
+          body: JSON.stringify({
+            redirect_uris: [REDIRECT],
+            response_types: ["code"],
+            grant_types: ["authorization_code", "refresh_token"],
+            token_endpoint_auth_method: "none",
+            client_name: "Moodle العربية",
+          }),
+        });
+        assert.equal(response.status, 201, response.text);
+        assert.equal(response.json.client_name, "Moodle العربية");
+      }
+      for (const [contentType, body] of [
+        ["text/plain", "{}"],
+        ["application/x-www-form-urlencoded", "redirect_uris=invalid"],
+        ["application/json", "{invalid"],
+      ]) {
+        const response = await client.request("/oauth/register", {
+          method: "POST",
+          headers: { "Content-Type": contentType },
+          body,
+        });
+        assert.equal(response.status, 400, response.text);
+        assert.equal(response.json.error, "invalid_request");
+      }
+    },
+  );
   const id = await register();
   let granted;
   await check("password, consent, PKCE exchange, code replay", async () => {

@@ -9,6 +9,7 @@ import { DurableSqlDatabase } from "./workers/sql-database.js";
 import { workerConfig, type WorkerEnv } from "./workers/config.js";
 import { reserveHttpRequest } from "./workers/limits.js";
 import { boundedBytes, BodyLimitError } from "./http.js";
+import { prepareNodeRequest } from "./workers/node-request.js";
 
 const fail = (status: number, message: string, retry?: number) =>
   new Response(message, {
@@ -89,15 +90,10 @@ export class MoodleMcp extends DurableObject<WorkerEnv> {
         this.runtime!.store.cleanup();
         this.nextCleanup = Date.now() + 3600000;
       }
-      if (request.method !== "GET" && request.method !== "HEAD") {
-        const body = await boundedBytes(
-          request,
-          path === "/mcp" ? 128 * 1024 : 16 * 1024,
-        );
-        const headers = new Headers(request.headers);
-        headers.delete("Content-Length");
-        request = new Request(request, { headers, body, redirect: "manual" });
-      }
+      request = await prepareNodeRequest(
+        request,
+        path === "/mcp" ? 128 * 1024 : 16 * 1024,
+      );
       const response = await handleAsNodeRequest(this.port, request);
       const bytes = await boundedBytes(response, 6 * 1024 * 1024);
       return new Response(bytes.length ? bytes : null, {
