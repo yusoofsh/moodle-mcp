@@ -1,4 +1,4 @@
-name = "moodle-mcp"
+name = "moodle"
 main = "src/worker.ts"
 compatibility_date = "2026-09-23"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
@@ -10,9 +10,9 @@ PUBLIC_URL = "https://moodle.yusoofsh.workers.dev"
 MOODLE_MCP_MAX_FILE_MB = "2"
 
 [[durable_objects.bindings]]
-name = "MOODLE_MCP"
-class_name = "MoodleMcp"
+name = "MOODLE"
+class_name = "Moodle"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["MoodleMcp"]
+new_sqlite_classes = ["Moodle"]
