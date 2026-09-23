@@ -1,4 +1,5 @@
 import type { Config } from "./config.js";
+import { HttpError, readBytes } from "./http.js";
 import { FileIdStore } from "./file-id-store.js";
 
 export interface SiteInfo {
@@ -28,7 +29,7 @@ export class MoodleClient {
   supportedFunctions: Set<string> = new Set();
   readonly fileIdStore: FileIdStore;
 
-  private readonly baseHost: string;
+  private readonly baseOrigin: string;
   readonly maxFileBytes: number;
 
   private constructor(
@@ -36,7 +37,9 @@ export class MoodleClient {
     private readonly token: string,
     maxFileBytes: number,
   ) {
-    this.baseHost = new URL(baseUrl).host;
+    this.baseOrigin = new URL(baseUrl).origin;
+    if (!Number.isSafeInteger(maxFileBytes) || maxFileBytes <= 0)
+      throw new Error("Invalid file download limit");
     this.fileIdStore = new FileIdStore(token);
     this.maxFileBytes = maxFileBytes;
   }
@@ -50,20 +53,39 @@ export class MoodleClient {
   static async create(config: Config): Promise<MoodleClient> {
     const token =
       config.token ??
-      (await MoodleClient.login(config.baseUrl, config.username!, config.password!));
+      (await MoodleClient.login(
+        config.baseUrl,
+        config.username!,
+        config.password!,
+      ));
     const client = new MoodleClient(config.baseUrl, token, config.maxFileBytes);
     const info = await client.call<SiteInfo>("core_webservice_get_site_info");
     client.userId = info.userid;
     client.siteName = info.sitename;
     client.release = info.release ?? "";
-    client.supportedFunctions = new Set(info.functions?.map((f) => f.name) ?? []);
+    client.supportedFunctions = new Set(
+      info.functions?.map((f) => f.name) ?? [],
+    );
     return client;
   }
 
-  private static async login(baseUrl: string, username: string, password: string): Promise<string> {
+  private static async login(
+    baseUrl: string,
+    username: string,
+    password: string,
+  ): Promise<string> {
     const url = `${baseUrl}/login/token.php`;
-    const body = new URLSearchParams({ username, password, service: "moodle_mobile_app" });
-    const res = await fetch(url, { method: "POST", body });
+    const body = new URLSearchParams({
+      username,
+      password,
+      service: "moodle_mobile_app",
+    });
+    const res = await fetch(url, {
+      method: "POST",
+      body,
+      redirect: "error",
+      signal: AbortSignal.timeout(20_000),
+    });
     const text = await res.text();
     let data: { token?: string; error?: string };
     try {
@@ -71,44 +93,56 @@ export class MoodleClient {
     } catch {
       throw new Error(
         "Moodle login returned an unexpected response — your school likely uses SSO (Microsoft/Google/CAS). " +
-        "Use a token instead: log in via browser, then visit " +
-        `${baseUrl}/login/token.php?service=moodle_mobile_app and set MOODLE_TOKEN.`
+          "Use a token instead: log in via browser, then visit " +
+          `${baseUrl}/login/token.php?service=moodle_mobile_app and set MOODLE_TOKEN.`,
       );
     }
     if (data.error) {
       throw new Error(
-        `Moodle login failed: ${data.error}. Check your username, password, and Moodle URL.`
+        `Moodle login failed: ${data.error}. Check your username, password, and Moodle URL.`,
       );
     }
     if (!data.token) {
       throw new Error(
-        "Moodle login failed: no token returned. Ensure the Moodle Mobile app service is enabled."
+        "Moodle login failed: no token returned. Ensure the Moodle Mobile app service is enabled.",
       );
     }
     return data.token;
   }
 
-  async call<T>(wsfunction: string, params: Record<string, string | number | boolean> = {}): Promise<T> {
+  async call<T>(
+    wsfunction: string,
+    params: Record<string, string | number | boolean> = {},
+  ): Promise<T> {
     const url = `${this.baseUrl}/webservice/rest/server.php`;
     const body = new URLSearchParams({
       wstoken: this.token,
       wsfunction,
       moodlewsrestformat: "json",
-      ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+      ...Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, String(v)]),
+      ),
     });
-    const res = await fetch(url, { method: "POST", body });
+    const res = await fetch(url, {
+      method: "POST",
+      body,
+      redirect: "error",
+      signal: AbortSignal.timeout(20_000),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status} from Moodle API`);
     const data = (await res.json()) as T & Partial<MoodleErrorResponse>;
     if (data.exception) {
       if (data.errorcode === "webservicesnotenabled") {
         throw new Error(
-          "Web services are not enabled on this Moodle server. Contact your IT department to enable them."
+          "Web services are not enabled on this Moodle server. Contact your IT department to enable them.",
         );
       }
       if (data.errorcode === "invalidtoken") {
         throw new Error("Invalid Moodle token. Check your MOODLE_TOKEN value.");
       }
-      throw new Error(`Moodle API error (${data.errorcode ?? "unknown"}): ${data.message ?? "No message"}`);
+      throw new Error(
+        `Moodle API error (${data.errorcode ?? "unknown"}): ${data.message ?? "No message"}`,
+      );
     }
     return data;
   }
@@ -116,7 +150,7 @@ export class MoodleClient {
   /**
    * Fetch a Moodle-managed file through the server. Only accepts pluginfile.php
    * URLs on this Moodle host — external `url` module targets are refused so we
-   * don't become an SSRF relay. Caps the response at MAX_DOWNLOAD_BYTES.
+   * don't become an SSRF relay. Enforces the configured cap while reading the response.
    *
    * The Moodle WS token is attached to the outbound request only; it never
    * reappears in anything returned to the MCP client.
@@ -128,36 +162,41 @@ export class MoodleClient {
     } catch {
       throw new Error("Invalid file URL");
     }
-    if (parsed.host !== this.baseHost) {
+    if (
+      parsed.origin !== this.baseOrigin ||
+      parsed.username ||
+      parsed.password
+    ) {
       throw new Error("Refused: file URL is not on this Moodle host");
     }
-    if (
-      !parsed.pathname.includes("/pluginfile.php") &&
-      !parsed.pathname.includes("/webservice/pluginfile.php")
-    ) {
-      throw new Error("Refused: only Moodle-managed pluginfile.php URLs can be fetched");
+    if (!/^\/(?:webservice\/)?pluginfile\.php(?:\/|$)/.test(parsed.pathname)) {
+      throw new Error(
+        "Refused: only Moodle-managed pluginfile.php URLs can be fetched",
+      );
     }
     parsed.searchParams.set("token", this.token);
 
-    const res = await fetch(parsed.toString());
+    let res: Response;
+    try {
+      res = await fetch(parsed.toString(), {
+        redirect: "error",
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch {
+      // A fetch error may include the URL, which contains the upstream token.
+      throw new Error("Moodle file download failed");
+    }
     if (!res.ok) throw new Error(`Failed to fetch file: HTTP ${res.status}`);
+    const bytes = await readBytes(res, this.maxFileBytes).catch(
+      (error: unknown) => {
+        if (error instanceof HttpError) throw error;
+        throw new Error("Moodle file download failed");
+      },
+    );
 
-    const maxMb = Math.round(this.maxFileBytes / 1024 / 1024);
-    const lengthHeader = res.headers.get("content-length");
-    if (lengthHeader && Number(lengthHeader) > this.maxFileBytes) {
-      throw new Error(
-        `File too large (${Math.round(Number(lengthHeader) / 1024 / 1024)} MB); max is ${maxMb} MB. Admins can raise the cap with MOODLE_MCP_MAX_FILE_MB.`,
-      );
-    }
-
-    const buf = await res.arrayBuffer();
-    if (buf.byteLength > this.maxFileBytes) {
-      throw new Error(
-        `File too large (${Math.round(buf.byteLength / 1024 / 1024)} MB); max is ${maxMb} MB. Admins can raise the cap with MOODLE_MCP_MAX_FILE_MB.`,
-      );
-    }
-
-    const mime = res.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream";
-    return { mime, bytes: new Uint8Array(buf) };
+    const mime =
+      res.headers.get("content-type")?.split(";")[0]?.trim() ||
+      "application/octet-stream";
+    return { mime, bytes };
   }
 }

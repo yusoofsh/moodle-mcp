@@ -104,7 +104,9 @@ export class FileIdStore {
       const plaintext = new Uint8Array(
         await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct),
       );
-      const payload = JSON.parse(new TextDecoder().decode(plaintext)) as SealedPayload;
+      const payload = JSON.parse(
+        new TextDecoder().decode(plaintext),
+      ) as SealedPayload;
       if (payload.exp < Date.now()) return null;
       if (payload.userId !== expectedUserId) return null;
       const { exp: _exp, ...ref } = payload;

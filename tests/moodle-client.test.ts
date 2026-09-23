@@ -1,8 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import { MoodleClient } from "../src/moodle-client.js";
 
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+const mockFetch = mock();
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  globalThis.fetch = mockFetch as unknown as typeof fetch;
+});
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
 
 function mockOkJson(data: unknown) {
   return Promise.resolve({
@@ -13,43 +19,55 @@ function mockOkJson(data: unknown) {
 }
 
 describe("MoodleClient.create with token", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => mockFetch.mockReset());
 
   it("fetches site info and exposes userId", async () => {
-    mockFetch.mockResolvedValueOnce(mockOkJson({
-      userid: 42,
-      username: "student",
-      sitename: "My Uni",
-      fullname: "Alice Smith",
-      release: "4.3.0",
-      functions: [{ name: "core_webservice_get_site_info", version: "1" }],
-    }));
+    mockFetch.mockResolvedValueOnce(
+      mockOkJson({
+        userid: 42,
+        username: "student",
+        sitename: "My Uni",
+        fullname: "Alice Smith",
+        release: "4.3.0",
+        functions: [{ name: "core_webservice_get_site_info", version: "1" }],
+      }),
+    );
 
     const client = await MoodleClient.create({
       baseUrl: "https://moodle.uni.edu",
+      maxFileBytes: 25 * 1024 * 1024,
       token: "tok123",
     });
 
     expect(client.userId).toBe(42);
     expect(client.siteName).toBe("My Uni");
     expect(client.release).toBe("4.3.0");
-    expect(client.supportedFunctions.has("core_webservice_get_site_info")).toBe(true);
-    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(client.supportedFunctions.has("core_webservice_get_site_info")).toBe(
+      true,
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("MoodleClient.create with username+password", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => mockFetch.mockReset());
 
   it("POSTs to /login/token.php then fetches site info", async () => {
     mockFetch
       .mockResolvedValueOnce(mockOkJson({ token: "fetched-token" }))
-      .mockResolvedValueOnce(mockOkJson({
-        userid: 7, username: "bob", sitename: "Uni", fullname: "Bob", release: "4.3.0",
-      }));
+      .mockResolvedValueOnce(
+        mockOkJson({
+          userid: 7,
+          username: "bob",
+          sitename: "Uni",
+          fullname: "Bob",
+          release: "4.3.0",
+        }),
+      );
 
     const client = await MoodleClient.create({
       baseUrl: "https://moodle.uni.edu",
+      maxFileBytes: 25 * 1024 * 1024,
       username: "bob",
       password: "pass",
     });
@@ -64,77 +82,119 @@ describe("MoodleClient.create with username+password", () => {
     mockFetch.mockResolvedValueOnce(mockOkJson({ error: "Invalid login" }));
 
     await expect(
-      MoodleClient.create({ baseUrl: "https://moodle.uni.edu", username: "x", password: "y" })
+      MoodleClient.create({
+        baseUrl: "https://moodle.uni.edu",
+        maxFileBytes: 25 * 1024 * 1024,
+        username: "x",
+        password: "y",
+      }),
     ).rejects.toThrow("Invalid login");
   });
 });
 
 describe("MoodleClient.call", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => mockFetch.mockReset());
 
   async function makeClient() {
-    mockFetch.mockResolvedValueOnce(mockOkJson({ userid: 1, username: "a", sitename: "b", fullname: "c", release: "4.3.0" }));
-    return MoodleClient.create({ baseUrl: "https://moodle.uni.edu", token: "t" });
+    mockFetch.mockResolvedValueOnce(
+      mockOkJson({
+        userid: 1,
+        username: "a",
+        sitename: "b",
+        fullname: "c",
+        release: "4.3.0",
+      }),
+    );
+    return MoodleClient.create({
+      baseUrl: "https://moodle.uni.edu",
+      maxFileBytes: 25 * 1024 * 1024,
+      token: "t",
+    });
   }
 
   it("throws on webservicesnotenabled error", async () => {
     const client = await makeClient();
-    mockFetch.mockResolvedValueOnce(mockOkJson({
-      exception: "moodle_exception",
-      errorcode: "webservicesnotenabled",
-      message: "Web services are disabled",
-    }));
-    await expect(client.call("any_function")).rejects.toThrow("Web services are not enabled");
+    mockFetch.mockResolvedValueOnce(
+      mockOkJson({
+        exception: "moodle_exception",
+        errorcode: "webservicesnotenabled",
+        message: "Web services are disabled",
+      }),
+    );
+    await expect(client.call("any_function")).rejects.toThrow(
+      "Web services are not enabled",
+    );
   });
 
   it("throws on invalidtoken error", async () => {
     const client = await makeClient();
-    mockFetch.mockResolvedValueOnce(mockOkJson({
-      exception: "moodle_exception",
-      errorcode: "invalidtoken",
-      message: "Invalid token",
-    }));
-    await expect(client.call("any_function")).rejects.toThrow("Invalid Moodle token");
+    mockFetch.mockResolvedValueOnce(
+      mockOkJson({
+        exception: "moodle_exception",
+        errorcode: "invalidtoken",
+        message: "Invalid token",
+      }),
+    );
+    await expect(client.call("any_function")).rejects.toThrow(
+      "Invalid Moodle token",
+    );
   });
 
   it("returns typed response on success", async () => {
     const client = await makeClient();
-    mockFetch.mockResolvedValueOnce(mockOkJson([{ id: 1, fullname: "Math 101" }]));
-    const result = await client.call<{ id: number; fullname: string }[]>("core_enrol_get_users_courses", { userid: 1 });
+    mockFetch.mockResolvedValueOnce(
+      mockOkJson([{ id: 1, fullname: "Math 101" }]),
+    );
+    const result = await client.call<{ id: number; fullname: string }[]>(
+      "core_enrol_get_users_courses",
+      { userid: 1 },
+    );
     expect(result[0].fullname).toBe("Math 101");
   });
 });
 
 describe("MoodleClient.downloadFile", () => {
   async function makeAuthedClient() {
-    mockFetch.mockResolvedValueOnce(mockOkJson({ userid: 1, username: "a", sitename: "b", fullname: "c", release: "4.3.0" }));
-    return MoodleClient.create({ baseUrl: "https://moodle.uni.edu", token: "mytoken" });
+    mockFetch.mockResolvedValueOnce(
+      mockOkJson({
+        userid: 1,
+        username: "a",
+        sitename: "b",
+        fullname: "c",
+        release: "4.3.0",
+      }),
+    );
+    return MoodleClient.create({
+      baseUrl: "https://moodle.uni.edu",
+      maxFileBytes: 25 * 1024 * 1024,
+      token: "mytoken",
+    });
   }
 
   it("refuses URLs on a different host", async () => {
     const client = await makeAuthedClient();
-    await expect(client.downloadFile("https://evil.example/pluginfile.php/x.pdf")).rejects.toThrow(
-      /not on this Moodle host/,
-    );
+    await expect(
+      client.downloadFile("https://evil.example/pluginfile.php/x.pdf"),
+    ).rejects.toThrow(/not on this Moodle host/);
   });
 
   it("refuses non-pluginfile paths on the Moodle host", async () => {
     const client = await makeAuthedClient();
-    await expect(client.downloadFile("https://moodle.uni.edu/other/path.pdf")).rejects.toThrow(
-      /pluginfile\.php/,
-    );
+    await expect(
+      client.downloadFile("https://moodle.uni.edu/other/path.pdf"),
+    ).rejects.toThrow(/pluginfile\.php/);
   });
 
   it("fetches pluginfile URL with token attached to the request, returning bytes", async () => {
     const client = await makeAuthedClient();
     const payload = new Uint8Array([1, 2, 3, 4]);
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      headers: new Headers({ "content-type": "application/pdf" }),
-      arrayBuffer: async () => payload.buffer,
-    } as Response);
+    mockFetch.mockResolvedValueOnce(
+      new Response(payload, { headers: { "content-type": "application/pdf" } }),
+    );
 
-    const result = await client.downloadFile("https://moodle.uni.edu/pluginfile.php/5/course/section/0/notes.pdf");
+    const result = await client.downloadFile(
+      "https://moodle.uni.edu/pluginfile.php/5/course/section/0/notes.pdf",
+    );
     expect(result.mime).toBe("application/pdf");
     expect(Array.from(result.bytes)).toEqual([1, 2, 3, 4]);
 

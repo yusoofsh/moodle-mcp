@@ -1,0 +1,7 @@
+# Example only. Copy to .dev.vars for local work. Never commit real credentials.
+MOODLE_URL=https://moodle.example.edu
+MOODLE_TOKEN=replace-with-your-authorized-moodle-token
+GITHUB_CLIENT_ID=replace-with-your-github-oauth-app-client-id
+GITHUB_CLIENT_SECRET=replace-with-your-github-oauth-app-client-secret
+# PUBLIC_URL and GITHUB_ALLOWED_USER_ID are configured in wrangler.toml.
+# Local HTTP is deliberately rejected: use a canonical HTTPS test endpoint.

@@ -32,10 +32,16 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function listResources(client: MoodleClient, courseId: number): Promise<string> {
-  const sections = await client.call<CourseSection[]>("core_course_get_contents", {
-    courseid: courseId,
-  });
+async function listResources(
+  client: MoodleClient,
+  courseId: number,
+): Promise<string> {
+  const sections = await client.call<CourseSection[]>(
+    "core_course_get_contents",
+    {
+      courseid: courseId,
+    },
+  );
 
   const lines: string[] = [`## Files — Course ${courseId}\n`];
   let hasFiles = false;
@@ -74,7 +80,9 @@ async function listResources(client: MoodleClient, courseId: number): Promise<st
           filesize: file.filesize,
         });
         const size = formatSize(file.filesize);
-        lines.push(`- 📄 **${file.filename}** *(${size})* — fileId: \`${fileId}\``);
+        lines.push(
+          `- 📄 **${file.filename}** *(${size})* — fileId: \`${fileId}\``,
+        );
       }
     }
     lines.push("");
@@ -87,13 +95,28 @@ async function listResources(client: MoodleClient, courseId: number): Promise<st
   return lines.join("\n");
 }
 
-export function registerFileTools(server: McpServer, client: MoodleClient): void {
-  server.tool(
+export function registerFileTools(
+  server: McpServer,
+  client: MoodleClient,
+): void {
+  server.registerTool(
     "moodle_list_resources",
-    "List all downloadable files and links in a course, grouped by the course's own sections (weeks, chapters, topics — as defined by the professor). Each file gets an opaque fileId you pass to moodle_download_file to read contents. External URL-module links are shown as-is.",
-    { courseId: z.number().describe("Course ID from moodle_list_courses") },
+    {
+      description:
+        "List all downloadable files and links in a course, grouped by the course's own sections (weeks, chapters, topics — as defined by the professor). Each file gets an opaque fileId you pass to moodle_download_file to read contents. External URL-module links are shown as-is.",
+      inputSchema: {
+        courseId: z.number().describe("Course ID from moodle_list_courses"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
     async ({ courseId }) => ({
-      content: [{ type: "text" as const, text: await listResources(client, courseId) }],
+      content: [
+        { type: "text" as const, text: await listResources(client, courseId) },
+      ],
     }),
   );
 }

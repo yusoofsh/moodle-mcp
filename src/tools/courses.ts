@@ -32,15 +32,21 @@ export async function listCourses(client: MoodleClient): Promise<string> {
   });
   if (courses.length === 0) return "You are not enrolled in any courses.";
   const lines = courses.map(
-    (c) => `- **${c.fullname}** (${c.shortname}) — ID: \`${c.id}\``
+    (c) => `- **${c.fullname}** (${c.shortname}) — ID: \`${c.id}\``,
   );
   return `## Your Courses\n\n${lines.join("\n")}`;
 }
 
-export async function getCourse(client: MoodleClient, courseId: number): Promise<string> {
-  const sections = await client.call<CourseSection[]>("core_course_get_contents", {
-    courseid: courseId,
-  });
+export async function getCourse(
+  client: MoodleClient,
+  courseId: number,
+): Promise<string> {
+  const sections = await client.call<CourseSection[]>(
+    "core_course_get_contents",
+    {
+      courseid: courseId,
+    },
+  );
   if (sections.length === 0) return "This course has no content.";
   const lines: string[] = [];
   for (const section of sections) {
@@ -54,20 +60,44 @@ export async function getCourse(client: MoodleClient, courseId: number): Promise
   return lines.length ? lines.join("\n") : "This course has no content.";
 }
 
-export function registerCourseTools(server: McpServer, client: MoodleClient): void {
-  server.tool(
+export function registerCourseTools(
+  server: McpServer,
+  client: MoodleClient,
+): void {
+  server.registerTool(
     "moodle_list_courses",
-    "List all Moodle courses you are enrolled in",
-    {},
-    async () => ({ content: [{ type: "text" as const, text: await listCourses(client) }] })
+    {
+      description: "List all Moodle courses you are enrolled in",
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async () => ({
+      content: [{ type: "text" as const, text: await listCourses(client) }],
+    }),
   );
 
-  server.tool(
+  server.registerTool(
     "moodle_get_course",
-    "Get the sections and modules of a specific course. Use moodle_list_courses first to get course IDs.",
-    { courseId: z.number().describe("Course ID from moodle_list_courses") },
+    {
+      description:
+        "Get the sections and modules of a specific course. Use moodle_list_courses first to get course IDs.",
+      inputSchema: {
+        courseId: z.number().describe("Course ID from moodle_list_courses"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
     async ({ courseId }) => ({
-      content: [{ type: "text" as const, text: await getCourse(client, courseId) }],
-    })
+      content: [
+        { type: "text" as const, text: await getCourse(client, courseId) },
+      ],
+    }),
   );
 }

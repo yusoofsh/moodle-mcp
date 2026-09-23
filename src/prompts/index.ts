@@ -24,13 +24,18 @@ Steps:
           },
         },
       ],
-    })
+    }),
   );
 
   server.prompt(
     "whats-due",
     "Show everything that's due soon across all courses (or one course), prioritized by urgency",
-    { courseId: z.string().optional().describe("Filter to a specific course ID (optional)") },
+    {
+      courseId: z
+        .string()
+        .optional()
+        .describe("Filter to a specific course ID (optional)"),
+    },
     async ({ courseId }) => ({
       messages: [
         {
@@ -54,7 +59,7 @@ Steps:
           },
         },
       ],
-    })
+    }),
   );
 
   server.prompt(
@@ -62,7 +67,11 @@ Steps:
     "Read all course materials and build a linked Obsidian vault — one note per topic, with [[wikilinks]] between concepts and a MOC index",
     {
       courseId: z.string().describe("Course ID (from moodle_list_courses)"),
-      vaultPath: z.string().describe("Absolute path to your Obsidian vault folder, e.g. ~/obsidian/finals"),
+      vaultPath: z
+        .string()
+        .describe(
+          "Absolute path to your Obsidian vault folder, e.g. ~/obsidian/finals",
+        ),
     },
     async ({ courseId, vaultPath }) => ({
       messages: [
@@ -90,7 +99,7 @@ The goal: open this vault in Obsidian, enable Graph View, and see the whole cour
           },
         },
       ],
-    })
+    }),
   );
 
   server.prompt(
@@ -120,7 +129,7 @@ Produce a study guide:
           },
         },
       ],
-    })
+    }),
   );
 
   server.prompt(
@@ -128,7 +137,11 @@ Produce a study guide:
     "Find all course materials related to a topic using natural language — reads matching files and synthesizes a focused answer",
     {
       courseId: z.string().describe("Course ID (from moodle_list_courses)"),
-      query: z.string().describe("What you're looking for, e.g. 'derivatives and limits', 'OSI model', 'contrat de travail'"),
+      query: z
+        .string()
+        .describe(
+          "What you're looking for, e.g. 'derivatives and limits', 'OSI model', 'contrat de travail'",
+        ),
     },
     async ({ courseId, query }) => ({
       messages: [
@@ -149,6 +162,6 @@ Format: brief intro, then the key content organized by subtopic, then which file
           },
         },
       ],
-    })
+    }),
   );
 }

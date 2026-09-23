@@ -43,13 +43,18 @@ function formatDate(ts: number): string {
   });
 }
 
-export async function listAssignments(client: MoodleClient, courseId: number): Promise<string> {
+export async function listAssignments(
+  client: MoodleClient,
+  courseId: number,
+): Promise<string> {
   if (!client.supports("mod_assign_get_assignments")) {
     return "Assignments API is not enabled on your Moodle. Ask your admin to enable the mod_assign web service.";
   }
 
   const [sections, assignData] = await Promise.all([
-    client.call<CourseSection[]>("core_course_get_contents", { courseid: courseId }),
+    client.call<CourseSection[]>("core_course_get_contents", {
+      courseid: courseId,
+    }),
     client.call<AssignmentsResponse>("mod_assign_get_assignments", {
       "courseids[0]": courseId,
     }),
@@ -74,7 +79,9 @@ export async function listAssignments(client: MoodleClient, courseId: number): P
         lines.push(`- **${mod.name}** *(details unavailable)*`);
         continue;
       }
-      const due = detail.duedate ? `Due: ${formatDate(detail.duedate)}` : "No due date";
+      const due = detail.duedate
+        ? `Due: ${formatDate(detail.duedate)}`
+        : "No due date";
       const maxGrade = detail.grade > 0 ? ` | Max grade: ${detail.grade}` : "";
       lines.push(`- **${detail.name}** — ${due}${maxGrade}`);
       lines.push(`  ID: \`${detail.id}\` (use with moodle_get_assignment)`);
@@ -86,16 +93,24 @@ export async function listAssignments(client: MoodleClient, courseId: number): P
   return lines.join("\n");
 }
 
-export async function getAssignment(client: MoodleClient, assignmentId: number): Promise<string> {
+export async function getAssignment(
+  client: MoodleClient,
+  assignmentId: number,
+): Promise<string> {
   if (!client.supports("mod_assign_get_submission_status")) {
     return "Assignment submission status API is not enabled on your Moodle.";
   }
 
-  const status = await client.call<SubmissionStatus>("mod_assign_get_submission_status", {
-    assignid: assignmentId,
-  });
+  const status = await client.call<SubmissionStatus>(
+    "mod_assign_get_submission_status",
+    {
+      assignid: assignmentId,
+    },
+  );
 
-  const lines: string[] = [`## Assignment ${assignmentId} — Submission Status\n`];
+  const lines: string[] = [
+    `## Assignment ${assignmentId} — Submission Status\n`,
+  ];
 
   const submission = status.lastattempt?.submission;
   if (submission) {
@@ -117,22 +132,57 @@ export async function getAssignment(client: MoodleClient, assignmentId: number):
   return lines.join("\n");
 }
 
-export function registerAssignmentTools(server: McpServer, client: MoodleClient): void {
-  server.tool(
+export function registerAssignmentTools(
+  server: McpServer,
+  client: MoodleClient,
+): void {
+  server.registerTool(
     "moodle_list_assignments",
-    "List all assignments in a course, grouped by the course's sections, with due dates and grade info. Returns assignment IDs for use with moodle_get_assignment.",
-    { courseId: z.number().describe("Course ID from moodle_list_courses") },
+    {
+      description:
+        "List all assignments in a course, grouped by the course's sections, with due dates and grade info. Returns assignment IDs for use with moodle_get_assignment.",
+      inputSchema: {
+        courseId: z.number().describe("Course ID from moodle_list_courses"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
     async ({ courseId }) => ({
-      content: [{ type: "text" as const, text: await listAssignments(client, courseId) }],
-    })
+      content: [
+        {
+          type: "text" as const,
+          text: await listAssignments(client, courseId),
+        },
+      ],
+    }),
   );
 
-  server.tool(
+  server.registerTool(
     "moodle_get_assignment",
-    "Get submission status and grade feedback for a specific assignment.",
-    { assignmentId: z.number().describe("Assignment ID from moodle_list_assignments") },
+    {
+      description:
+        "Get submission status and grade feedback for a specific assignment.",
+      inputSchema: {
+        assignmentId: z
+          .number()
+          .describe("Assignment ID from moodle_list_assignments"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
     async ({ assignmentId }) => ({
-      content: [{ type: "text" as const, text: await getAssignment(client, assignmentId) }],
-    })
+      content: [
+        {
+          type: "text" as const,
+          text: await getAssignment(client, assignmentId),
+        },
+      ],
+    }),
   );
 }

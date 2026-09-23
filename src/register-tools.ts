@@ -11,7 +11,10 @@ import { registerForumTools } from "./tools/forums.js";
 import { registerNotificationTools } from "./tools/notifications.js";
 import { registerSiteInfoTool } from "./tools/siteinfo.js";
 
-export function registerAllTools(server: McpServer, client: MoodleClient): void {
+export function registerAllTools(
+  server: McpServer,
+  client: MoodleClient,
+): void {
   registerCourseTools(server, client);
   registerFileTools(server, client);
   registerDownloadTool(server, client);

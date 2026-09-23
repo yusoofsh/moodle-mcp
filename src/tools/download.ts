@@ -32,7 +32,10 @@ function bytesToBase64(bytes: Uint8Array): string {
   let s = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
-    s += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk) as unknown as number[]);
+    s += String.fromCharCode.apply(
+      null,
+      bytes.subarray(i, i + chunk) as unknown as number[],
+    );
   }
   return btoa(s);
 }
@@ -42,11 +45,17 @@ function bytesToBase64(bytes: Uint8Array): string {
  * user. Catches unenrolment, module hides, file removal between the list
  * call and the download call.
  */
-async function reauthorize(client: MoodleClient, ref: FileRef): Promise<boolean> {
+async function reauthorize(
+  client: MoodleClient,
+  ref: FileRef,
+): Promise<boolean> {
   try {
-    const sections = await client.call<CourseSection[]>("core_course_get_contents", {
-      courseid: ref.courseId,
-    });
+    const sections = await client.call<CourseSection[]>(
+      "core_course_get_contents",
+      {
+        courseid: ref.courseId,
+      },
+    );
     for (const section of sections) {
       for (const mod of section.modules) {
         for (const file of mod.contents ?? []) {
@@ -60,12 +69,25 @@ async function reauthorize(client: MoodleClient, ref: FileRef): Promise<boolean>
   return false;
 }
 
-export function registerDownloadTool(server: McpServer, client: MoodleClient): void {
-  server.tool(
+export function registerDownloadTool(
+  server: McpServer,
+  client: MoodleClient,
+): void {
+  server.registerTool(
     "moodle_download_file",
-    "Download a Moodle course file by its opaque fileId (from moodle_list_resources). Returns text for text/JSON/XML files; returns the raw bytes as an embedded resource for binary formats like PDFs, DOCX, images. The server fetches the file — you never need to fetch Moodle URLs directly.",
     {
-      fileId: z.string().describe("Opaque fileId returned by moodle_list_resources"),
+      description:
+        "Download a Moodle course file by its opaque fileId (from moodle_list_resources). Returns text for text/JSON/XML files; returns the raw bytes as an embedded resource for binary formats like PDFs, DOCX, images. The server fetches the file — you never need to fetch Moodle URLs directly.",
+      inputSchema: {
+        fileId: z
+          .string()
+          .describe("Opaque fileId returned by moodle_list_resources"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
     },
     async ({ fileId }) => {
       const ref = await client.fileIdStore.open(fileId, client.userId);
@@ -101,7 +123,9 @@ export function registerDownloadTool(server: McpServer, client: MoodleClient): v
         const message = err instanceof Error ? err.message : "Unknown error";
         return {
           isError: true,
-          content: [{ type: "text" as const, text: `Download failed: ${message}` }],
+          content: [
+            { type: "text" as const, text: `Download failed: ${message}` },
+          ],
         };
       }
 
@@ -109,7 +133,9 @@ export function registerDownloadTool(server: McpServer, client: MoodleClient): v
       const resourceUri = `moodle://files/${encodeURIComponent(ref.filename)}`;
 
       if (isTextMime(mime)) {
-        const text = new TextDecoder("utf-8", { fatal: false }).decode(downloaded.bytes);
+        const text = new TextDecoder("utf-8", { fatal: false }).decode(
+          downloaded.bytes,
+        );
         return {
           content: [
             {

@@ -8,44 +8,16 @@ import { registerResources } from "./resources/index.js";
 import { registerPrompts } from "./prompts/index.js";
 
 if (process.stdin.isTTY && !process.env.MOODLE_URL) {
-  console.log(`
-moodle-mcp v0.2.0 — Moodle MCP Server
+  console.log(`moodle-mcp v0.3.0 — private OAuth fork
 
-This tool runs as a background server for Claude — you don't run it directly.
-Add it to your Claude config and restart Claude.
+Local stdio: set MOODLE_URL and MOODLE_TOKEN securely, then configure your MCP
+client to run node with the absolute path to this checkout's dist/server.js.
+The upstream npx package does not select this fork.
 
-━━━ Claude Desktop ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Config file:
-  Mac:     ~/Library/Application Support/Claude/claude_desktop_config.json
-  Windows: %APPDATA%\\Claude\\claude_desktop_config.json
+Hosted ChatGPT: follow docs/CHATGPT-OAUTH.md. The Worker requires owner-only
+OAuth and is served at your canonical HTTPS origin's /mcp endpoint.
 
-Paste this into the JSON:
-  "mcpServers": {
-    "moodle": {
-      "command": "npx",
-      "args": ["-y", "moodle-mcp"],
-      "env": {
-        "MOODLE_URL": "https://moodle.yourschool.edu",
-        "MOODLE_TOKEN": "your_token_here"
-      }
-    }
-  }
-
-━━━ Claude Code (CLI) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Run once in your project folder:
-  claude mcp add moodle npx -- -y moodle-mcp \\
-    -e MOODLE_URL=https://moodle.yourschool.edu \\
-    -e MOODLE_TOKEN=your_token_here
-
-━━━ Get your Moodle token ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Log in to your school's Moodle in a browser
-2. Go to: https://moodle.yourschool.edu/user/managetoken.php
-3. Copy the "Moodle mobile web service" token
-
-SSO school (Microsoft/Google login)? Use the Moodle mobile app:
-  App settings → About → tap version 5× → Developer options → Copy token
-
-Full guide: https://github.com/1alexandrer/moodle-mcp#getting-your-token
+Guide: https://github.com/yusoofsh/moodle-mcp
 `);
   process.exit(0);
 }
@@ -56,7 +28,7 @@ async function main() {
 
   const server = new McpServer({
     name: "moodle-mcp",
-    version: "0.2.0",
+    version: "0.3.0",
   });
 
   registerAllTools(server, client);

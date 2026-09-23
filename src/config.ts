@@ -40,11 +40,13 @@ export function getConfig(): Config {
 
   if (!token && (!username || !password)) {
     throw new Error(
-      "Set either MOODLE_TOKEN or both MOODLE_USERNAME and MOODLE_PASSWORD"
+      "Set either MOODLE_TOKEN or both MOODLE_USERNAME and MOODLE_PASSWORD",
     );
   }
 
-  const maxFileBytes = Math.floor(parseMaxFileMb(process.env.MOODLE_MCP_MAX_FILE_MB) * 1024 * 1024);
+  const maxFileBytes = Math.floor(
+    parseMaxFileMb(process.env.MOODLE_MCP_MAX_FILE_MB) * 1024 * 1024,
+  );
 
   return { baseUrl, token, username, password, maxFileBytes };
 }

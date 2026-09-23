@@ -1,11 +1,22 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { MoodleClient } from "../moodle-client.js";
 
-export function registerSiteInfoTool(server: McpServer, client: MoodleClient): void {
-  server.tool(
+export function registerSiteInfoTool(
+  server: McpServer,
+  client: MoodleClient,
+): void {
+  server.registerTool(
     "moodle_get_site_info",
-    "Get information about your Moodle server and your account: school name, Moodle version, your name, and which APIs are enabled.",
-    {},
+    {
+      description:
+        "Get information about your Moodle server and your account: school name, Moodle version, your name, and which APIs are enabled.",
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
     async () => {
       const enabledCount = client.supportedFunctions.size;
       const lines = [
@@ -20,13 +31,31 @@ export function registerSiteInfoTool(server: McpServer, client: MoodleClient): v
       if (enabledCount > 0) {
         const toolStatus = [
           { name: "moodle_list_assignments", fn: "mod_assign_get_assignments" },
-          { name: "moodle_get_assignment", fn: "mod_assign_get_submission_status" },
+          {
+            name: "moodle_get_assignment",
+            fn: "mod_assign_get_submission_status",
+          },
           { name: "moodle_get_grades", fn: "gradereport_user_get_grade_items" },
-          { name: "moodle_get_calendar_events", fn: "core_calendar_get_action_events_by_timesort" },
-          { name: "moodle_list_quizzes", fn: "mod_quiz_get_quizzes_by_courses" },
-          { name: "moodle_get_quiz_attempts", fn: "mod_quiz_get_user_attempts" },
-          { name: "moodle_get_forum_discussions", fn: "mod_forum_get_forum_discussions" },
-          { name: "moodle_get_notifications", fn: "message_popup_get_popup_notifications" },
+          {
+            name: "moodle_get_calendar_events",
+            fn: "core_calendar_get_action_events_by_timesort",
+          },
+          {
+            name: "moodle_list_quizzes",
+            fn: "mod_quiz_get_quizzes_by_courses",
+          },
+          {
+            name: "moodle_get_quiz_attempts",
+            fn: "mod_quiz_get_user_attempts",
+          },
+          {
+            name: "moodle_get_forum_discussions",
+            fn: "mod_forum_get_forum_discussions",
+          },
+          {
+            name: "moodle_get_notifications",
+            fn: "message_popup_get_popup_notifications",
+          },
         ];
 
         lines.push(``, `**Tool availability on this server:**`);
@@ -41,6 +70,6 @@ export function registerSiteInfoTool(server: McpServer, client: MoodleClient): v
       }
 
       return { content: [{ type: "text" as const, text: lines.join("\n") }] };
-    }
+    },
   );
 }
