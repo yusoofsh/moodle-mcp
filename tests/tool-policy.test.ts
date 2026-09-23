@@ -33,25 +33,20 @@ describe("read-only tools and file access", () => {
     }
   });
   it("refuses hidden modules during file reauthorization", async () => {
-    const client = {
-      call: vi
-        .fn()
-        .mockResolvedValue([
+    const modules = [
+      {
+        uservisible: false,
+        contents: [
           {
-            modules: [
-              {
-                uservisible: false,
-                contents: [
-                  {
-                    type: "file",
-                    fileurl: "https://school.example/pluginfile.php/a",
-                  },
-                ],
-              },
-            ],
+            type: "file",
+            fileurl: "https://school.example/pluginfile.php/a",
           },
-        ]),
-    } as unknown as MoodleClient;
+        ],
+      },
+    ];
+    const call = vi.fn();
+    call.mockResolvedValue([{ modules }]);
+    const client = { call } as unknown as MoodleClient;
     expect(
       await reauthorize(client, {
         userId: 1,
