@@ -70,14 +70,12 @@ describe("Workers portability and limits", () => {
     },
   );
   it("rejects redirects and does not expose credential-bearing errors", async () => {
-    const mock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(null, {
-          status: 302,
-          headers: { Location: "https://evil.example" },
-        }),
-      );
+    const mock = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { Location: "https://evil.example" },
+      }),
+    );
     vi.stubGlobal("fetch", mock);
     await expect(
       fetchWithoutRedirect("https://moodle.example?token=private", {
