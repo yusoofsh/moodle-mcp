@@ -23,9 +23,23 @@ export function parseMaxFileMb(raw: string | undefined): number {
 export function normalizeUrl(raw: string): string {
   try {
     const url = new URL(raw);
-    return url.origin;
+    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (
+      url.username ||
+      url.password ||
+      (url.protocol !== "https:" && !(url.protocol === "http:" && loopback))
+    ) {
+      throw new Error("HTTPS is required except on loopback");
+    }
+    // Keep installation prefixes, but tolerate a copied course/API URL.
+    const path = url.pathname
+      .replace(/\/(?:course|mod|user|my|login|webservice)(?:\/.*)?$/, "")
+      .replace(/\/+$/, "");
+    return url.origin + path;
   } catch {
-    throw new Error(`Invalid MOODLE_URL: "${raw}" is not a valid URL`);
+    throw new Error(
+      "Invalid MOODLE_URL: use an HTTPS Moodle URL without credentials",
+    );
   }
 }
 
@@ -40,11 +54,13 @@ export function getConfig(): Config {
 
   if (!token && (!username || !password)) {
     throw new Error(
-      "Set either MOODLE_TOKEN or both MOODLE_USERNAME and MOODLE_PASSWORD"
+      "Set either MOODLE_TOKEN or both MOODLE_USERNAME and MOODLE_PASSWORD",
     );
   }
 
-  const maxFileBytes = Math.floor(parseMaxFileMb(process.env.MOODLE_MCP_MAX_FILE_MB) * 1024 * 1024);
+  const maxFileBytes = Math.floor(
+    parseMaxFileMb(process.env.MOODLE_MCP_MAX_FILE_MB) * 1024 * 1024,
+  );
 
   return { baseUrl, token, username, password, maxFileBytes };
 }

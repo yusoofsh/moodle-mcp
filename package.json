@@ -1,7 +1,7 @@
 {
-  "name": "moodle-mcp",
-  "version": "0.2.0",
-  "description": "MCP server for Moodle — give Claude access to your courses, files, grades, and more. Build Obsidian study vaults from lecture notes in one command.",
+  "name": "@yusoofsh/moodle-mcp",
+  "version": "0.3.0",
+  "description": "Read-only Moodle MCP with OAuth, GitHub owner authentication, and OCI deployment",
   "type": "module",
   "bin": {
     "moodle-mcp": "./dist/server.js"
@@ -14,24 +14,38 @@
   ],
   "scripts": {
     "build": "tsc",
-    "deploy": "wrangler deploy",
-    "dev": "npx @modelcontextprotocol/inspector node dist/server.js",
+    "start": "node dist/http-server.js",
+    "start:stdio": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run build && npm test"
+    "check": "tsc --noEmit",
+    "prepublishOnly": "bun run build && bun run test",
+    "format": "prettier --write src tests package.json tsconfig.json vitest.config.ts .github/workflows/publish.yml compose.yaml README.md SECURITY.md docs/TRIAGE.md docs/REVIEW.md",
+    "format:check": "prettier --check src tests package.json tsconfig.json vitest.config.ts .github/workflows/publish.yml compose.yaml README.md SECURITY.md docs/TRIAGE.md docs/REVIEW.md"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "zod": "^3.23.0"
+    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/express": "2.0.0",
+    "express": "5.2.1",
+    "express-rate-limit": "8.7.0",
+    "helmet": "8.3.0",
+    "oidc-provider": "9.12.2",
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "^5.5.0",
-    "vitest": "^2.0.0",
-    "wrangler": "^4.84.1"
+    "@modelcontextprotocol/client": "2.0.0",
+    "@types/express": "5.0.6",
+    "@types/node": "^24.0.0",
+    "@types/oidc-provider": "9.12.1",
+    "@types/supertest": "^7.0.0",
+    "prettier": "3.9.9",
+    "supertest": "^7.2.2",
+    "typescript": "^5.9.0",
+    "vitest": "5.0.1"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "license": "MIT",
   "keywords": [
@@ -45,10 +59,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/1alexandrer/moodle-mcp.git"
+    "url": "https://github.com/yusoofsh/moodle-mcp.git"
   },
-  "homepage": "https://github.com/1alexandrer/moodle-mcp#readme",
+  "homepage": "https://github.com/yusoofsh/moodle-mcp",
   "bugs": {
-    "url": "https://github.com/1alexandrer/moodle-mcp/issues"
-  }
+    "url": "https://github.com/yusoofsh/moodle-mcp/issues"
+  },
+  "packageManager": "bun@1.4.2"
 }

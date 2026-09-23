@@ -1,5 +1,6 @@
+import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
 
 interface CalendarEvent {
@@ -28,7 +29,7 @@ function formatDate(ts: number): string {
 export async function getCalendarEvents(
   client: MoodleClient,
   courseId?: number,
-  daysAhead = 30
+  daysAhead = 30,
 ): Promise<string> {
   if (!client.supports("core_calendar_get_action_events_by_timesort")) {
     return "Calendar API is not enabled on your Moodle. Ask your admin to enable core_calendar web services.";
@@ -43,7 +44,7 @@ export async function getCalendarEvents(
       timesortfrom: now,
       timesortto: until,
       limitnum: 50,
-    }
+    },
   );
 
   let events = data.events ?? [];
@@ -80,16 +81,36 @@ export async function getCalendarEvents(
   return lines.join("\n");
 }
 
-export function registerCalendarTools(server: McpServer, client: MoodleClient): void {
-  server.tool(
-    "moodle_get_calendar_events",
-    "Get upcoming calendar events (assignments due, quizzes opening, etc.), optionally filtered to one course. Defaults to the next 30 days.",
-    {
-      courseId: z.number().optional().describe("Filter to a specific course ID (optional)"),
-      daysAhead: z.number().optional().describe("How many days ahead to look (default: 30)"),
-    },
-    async ({ courseId, daysAhead }) => ({
-      content: [{ type: "text" as const, text: await getCalendarEvents(client, courseId, daysAhead) }],
-    })
-  );
+export function registerCalendarTools(
+  server: McpServer,
+  client: MoodleClient,
+): void {
+  if (canRegister(client, "moodle_get_calendar_events"))
+    server.registerTool(
+      "moodle_get_calendar_events",
+      {
+        description:
+          "Get upcoming calendar events (assignments due, quizzes opening, etc.), optionally filtered to one course. Defaults to the next 30 days.",
+        inputSchema: z.object({
+          courseId: z
+            .number()
+            .optional()
+            .describe("Filter to a specific course ID (optional)"),
+          daysAhead: z
+            .number()
+            .optional()
+            .describe("How many days ahead to look (default: 30)"),
+        }),
+        annotations: READ_ONLY,
+        _meta: AUTH_META,
+      },
+      async ({ courseId, daysAhead }) => ({
+        content: [
+          {
+            type: "text" as const,
+            text: await getCalendarEvents(client, courseId, daysAhead),
+          },
+        ],
+      }),
+    );
 }

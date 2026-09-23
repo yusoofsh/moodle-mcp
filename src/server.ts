@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { getConfig } from "./config.js";
 import { MoodleClient } from "./moodle-client.js";
 import { registerAllTools } from "./register-tools.js";
@@ -9,7 +9,7 @@ import { registerPrompts } from "./prompts/index.js";
 
 if (process.stdin.isTTY && !process.env.MOODLE_URL) {
   console.log(`
-moodle-mcp v0.2.0 — Moodle MCP Server
+moodle-mcp v0.3.0 — Moodle MCP Server
 
 This tool runs as a background server for Claude — you don't run it directly.
 Add it to your Claude config and restart Claude.
@@ -56,7 +56,7 @@ async function main() {
 
   const server = new McpServer({
     name: "moodle-mcp",
-    version: "0.2.0",
+    version: "0.3.0",
   });
 
   registerAllTools(server, client);

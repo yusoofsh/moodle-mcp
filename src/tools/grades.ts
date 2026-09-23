@@ -1,5 +1,6 @@
+import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
 
 interface GradeItem {
@@ -28,15 +29,21 @@ interface GradeReport {
   }[];
 }
 
-export async function getGrades(client: MoodleClient, courseId: number): Promise<string> {
+export async function getGrades(
+  client: MoodleClient,
+  courseId: number,
+): Promise<string> {
   if (!client.supports("gradereport_user_get_grade_items")) {
     return "Grades API is not enabled on your Moodle. Ask your admin to enable the gradereport_user web service.";
   }
 
-  const report = await client.call<GradeReport>("gradereport_user_get_grade_items", {
-    courseid: courseId,
-    userid: client.userId,
-  });
+  const report = await client.call<GradeReport>(
+    "gradereport_user_get_grade_items",
+    {
+      courseid: courseId,
+      userid: client.userId,
+    },
+  );
 
   const userGrades = report.usergrades[0];
   if (!userGrades || userGrades.gradeitems.length === 0) {
@@ -44,7 +51,7 @@ export async function getGrades(client: MoodleClient, courseId: number): Promise
   }
 
   const categories = new Map(
-    (userGrades.gradecategories ?? []).map((c) => [c.id, c.fullname])
+    (userGrades.gradecategories ?? []).map((c) => [c.id, c.fullname]),
   );
 
   const lines: string[] = [`## Grades — Course ${courseId}\n`];
@@ -53,9 +60,10 @@ export async function getGrades(client: MoodleClient, courseId: number): Promise
   const byCat = new Map<string, GradeItem[]>();
   for (const item of userGrades.gradeitems) {
     if (item.itemtype === "course") continue; // Skip the course total row, add at end
-    const catName = item.categoryid != null
-      ? (categories.get(item.categoryid) ?? "Uncategorized")
-      : "Uncategorized";
+    const catName =
+      item.categoryid != null
+        ? (categories.get(item.categoryid) ?? "Uncategorized")
+        : "Uncategorized";
     if (!byCat.has(catName)) byCat.set(catName, []);
     byCat.get(catName)!.push(item);
   }
@@ -69,28 +77,46 @@ export async function getGrades(client: MoodleClient, courseId: number): Promise
       const grade = item.gradeformatted || "—";
       const max = item.grademax > 0 ? String(item.grademax) : "—";
       const pct = item.percentageformatted ?? "—";
-      const feedback = (item.feedback ?? "").replace(/\n/g, " ").slice(0, 60) || "—";
+      const feedback =
+        (item.feedback ?? "").replace(/\n/g, " ").slice(0, 60) || "—";
       lines.push(`| ${name} | ${grade} | ${max} | ${pct} | ${feedback} |`);
     }
     lines.push("");
   }
 
   // Course total
-  const courseTotalItem = userGrades.gradeitems.find((i) => i.itemtype === "course");
+  const courseTotalItem = userGrades.gradeitems.find(
+    (i) => i.itemtype === "course",
+  );
   if (courseTotalItem) {
-    lines.push(`**Course Total:** ${courseTotalItem.gradeformatted} / ${courseTotalItem.grademax} (${courseTotalItem.percentageformatted ?? "—"})`);
+    lines.push(
+      `**Course Total:** ${courseTotalItem.gradeformatted} / ${courseTotalItem.grademax} (${courseTotalItem.percentageformatted ?? "—"})`,
+    );
   }
 
   return lines.join("\n");
 }
 
-export function registerGradeTools(server: McpServer, client: MoodleClient): void {
-  server.tool(
-    "moodle_get_grades",
-    "Get your full grade report for a course — all graded items, categories, percentages, and feedback.",
-    { courseId: z.number().describe("Course ID from moodle_list_courses") },
-    async ({ courseId }) => ({
-      content: [{ type: "text" as const, text: await getGrades(client, courseId) }],
-    })
-  );
+export function registerGradeTools(
+  server: McpServer,
+  client: MoodleClient,
+): void {
+  if (canRegister(client, "moodle_get_grades"))
+    server.registerTool(
+      "moodle_get_grades",
+      {
+        description:
+          "Get your full grade report for a course — all graded items, categories, percentages, and feedback.",
+        inputSchema: z.object({
+          courseId: z.number().describe("Course ID from moodle_list_courses"),
+        }),
+        annotations: READ_ONLY,
+        _meta: AUTH_META,
+      },
+      async ({ courseId }) => ({
+        content: [
+          { type: "text" as const, text: await getGrades(client, courseId) },
+        ],
+      }),
+    );
 }

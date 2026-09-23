@@ -1,0 +1,98 @@
+name: Test and publish OCI image
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: oci-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run format:check
+      - run: bun run check
+      - run: bun run test
+      - run: bun run build
+      - run: bun audit
+      - name: Build and smoke-test the container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --tag moodle-mcp:smoke .
+          if docker run --rm moodle-mcp:smoke; then
+            echo 'Missing configuration must fail closed'; exit 1
+          fi
+          docker run -d --name moodle-smoke -p 127.0.0.1:3000:3000 \
+            -e PUBLIC_URL=http://localhost:3000 -e ALLOW_INSECURE_HTTP=true \
+            -e GITHUB_CLIENT_ID=smoke -e GITHUB_CLIENT_SECRET=smoke \
+            -e GITHUB_ALLOWED_USER_ID=18055365 -e AUTH_SECRET="$(openssl rand -hex 32)" \
+            -e MOODLE_URL=https://moodle.invalid -e MOODLE_TOKEN=smoke \
+            moodle-mcp:smoke
+          trap 'docker logs moodle-smoke; docker rm -f moodle-smoke' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/healthz; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:3000/healthz
+          curl -fsS http://localhost:3000/.well-known/oauth-protected-resource/mcp
+          curl -fsS http://localhost:3000/.well-known/oauth-authorization-server
+          status=$(curl -sS -o /tmp/unauthorized.json -w '%{http_code}' -X POST http://localhost:3000/mcp)
+          test "$status" = 401
+          test "$(docker inspect --format '{{.Config.User}}' moodle-smoke)" = node
+  publish:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish multi-platform OCI image
+        id: image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          outputs: type=image,push=true,oci-mediatypes=true
+          tags: |
+            ghcr.io/yusoofsh/moodle-mcp:latest
+            ghcr.io/yusoofsh/moodle-mcp:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/yusoofsh/moodle-mcp
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=0.3.0
+            org.opencontainers.image.licenses=MIT
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Record immutable digest
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          echo '## Published image' >> "$GITHUB_STEP_SUMMARY"
+          echo "ghcr.io/yusoofsh/moodle-mcp@$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+          docker buildx imagetools inspect "ghcr.io/yusoofsh/moodle-mcp@$IMAGE_DIGEST"

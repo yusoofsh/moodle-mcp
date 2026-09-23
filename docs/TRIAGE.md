@@ -1,0 +1,32 @@
+# Triage — OAuth/OCI foundation
+
+Date: 2026-09-23. Baseline: `96b6fb1a4f3e942fbf9706870e1a39a276cda008` on the existing `master` default branch. No branch rename or force push is required. This fork has GitHub Issues disabled, so the initial triage is recorded here.
+
+## Implemented in this change
+
+| Priority | Finding                                                                                               | Resolution                                                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| P0       | Hosted Worker accepted requests using the owner's Moodle credential without authenticating the caller | New OAuth-protected container endpoint; inherited Worker separately fails closed behind a distinct static token                     |
+| P0       | Student data must not be shared with arbitrary GitHub users                                           | Numeric owner allowlist, account-bound sessions and explicit consent; no auto-approval                                              |
+| P1       | Tool download and MCP resource access had different permission checks                                 | Both recheck current course-file visibility; hidden modules are rejected                                                            |
+| P1       | Download origin/path validation and redirects were too permissive                                     | Exact origin and installation path, no URL credentials, no redirects, streaming size cap and timeout                                |
+| P1       | Static Moodle token was unsuitable as the client-facing OAuth token                                   | Established OAuth provider issues separate opaque access/refresh credentials; Moodle token stays server side                        |
+| P1       | OAuth state and grants must survive container restarts                                                | Encrypted persistent SQLite adapter, one-use authorization state, rotating refresh tokens, revocation                               |
+| P1       | Dependencies were stale                                                                               | MCP SDK v2, current pinned runtime dependencies and Bun lockfile; initial audit reported 19 advisories, updated audit reported none |
+| P1       | No OCI publication path                                                                               | Multi-stage non-root image, Compose file and test-gated multi-architecture GHCR workflow                                            |
+| P2       | All hard-coded tools were advertised even when unavailable                                            | Register only tools whose required Moodle APIs are reported; diagnostic site-info remains available                                 |
+| P2       | Moodle installations in subdirectories were normalized incorrectly                                    | Preserve installation prefix while tolerating copied course URLs                                                                    |
+| P2       | Protocol/auth errors and consent input needed negative tests                                          | Regression coverage for 401 responses, Unicode CSRF, denial, PKCE, resource mismatch, refresh replay and revocation                 |
+
+## Follow-up backlog — not shipped or claimed complete
+
+1. Live acceptance on the owner's Moodle instance and in the owner's ChatGPT interface after supplying deployment URL and credentials.
+2. Full pagination and accurate aggregation of deadline overrides, group submissions, overdue work and semester dashboards.
+3. Structured output schemas for existing text-oriented tools; course completion, announcements, metadata search and profile improvements.
+4. PDF/DOCX text extraction and bounded content retrieval appropriate to the MCP client's response limits.
+5. CIMD client metadata support; DCR is implemented for this release.
+6. Periodic capability refresh, upstream response-size limits and bounded request concurrency for heavier accounts.
+7. Real ARM64 runtime smoke tests in addition to the multi-platform image build.
+8. Multi-user isolation, multiple Moodle accounts, multiple replicas and external database support are outside the single-owner design.
+
+No Moodle write tools are introduced. Adding them requires separate scopes, explicit server-side policy, tests and a new review.

@@ -1,0 +1,21 @@
+services:
+  moodle-mcp:
+    image: ghcr.io/yusoofsh/moodle-mcp:latest
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - oauth-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    pids_limit: 100
+volumes:
+  oauth-data:

@@ -3,19 +3,27 @@ import { normalizeUrl, getConfig } from "../src/config.js";
 
 describe("normalizeUrl", () => {
   it("returns the origin of a base URL", () => {
-    expect(normalizeUrl("https://moodle.uni.edu")).toBe("https://moodle.uni.edu");
+    expect(normalizeUrl("https://moodle.uni.edu")).toBe(
+      "https://moodle.uni.edu",
+    );
   });
 
   it("strips trailing slash", () => {
-    expect(normalizeUrl("https://moodle.uni.edu/")).toBe("https://moodle.uni.edu");
+    expect(normalizeUrl("https://moodle.uni.edu/")).toBe(
+      "https://moodle.uni.edu",
+    );
   });
 
   it("strips path from a full course URL", () => {
-    expect(normalizeUrl("https://moodle.uni.edu/course/view.php?id=5")).toBe("https://moodle.uni.edu");
+    expect(normalizeUrl("https://moodle.uni.edu/course/view.php?id=5")).toBe(
+      "https://moodle.uni.edu",
+    );
   });
 
   it("strips path and query params", () => {
-    expect(normalizeUrl("https://moodle.uni.edu/mod/assign/view.php?id=99")).toBe("https://moodle.uni.edu");
+    expect(
+      normalizeUrl("https://moodle.uni.edu/mod/assign/view.php?id=99"),
+    ).toBe("https://moodle.uni.edu");
   });
 
   it("throws on invalid URL", () => {

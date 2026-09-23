@@ -1,11 +1,16 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 
 export function registerPrompts(server: McpServer): void {
-  server.prompt(
+  server.registerPrompt(
     "summarize-course",
-    "Summarize a Moodle course — sections, materials, and activities — organized by the course's own structure",
-    { courseId: z.string().describe("Course ID (from moodle_list_courses)") },
+    {
+      description:
+        "Summarize a Moodle course — sections, materials, and activities — organized by the course's own structure",
+      argsSchema: z.object({
+        courseId: z.string().describe("Course ID (from moodle_list_courses)"),
+      }),
+    },
     async ({ courseId }) => ({
       messages: [
         {
@@ -24,13 +29,21 @@ Steps:
           },
         },
       ],
-    })
+    }),
   );
 
-  server.prompt(
+  server.registerPrompt(
     "whats-due",
-    "Show everything that's due soon across all courses (or one course), prioritized by urgency",
-    { courseId: z.string().optional().describe("Filter to a specific course ID (optional)") },
+    {
+      description:
+        "Show everything that's due soon across all courses (or one course), prioritized by urgency",
+      argsSchema: z.object({
+        courseId: z
+          .string()
+          .optional()
+          .describe("Filter to a specific course ID (optional)"),
+      }),
+    },
     async ({ courseId }) => ({
       messages: [
         {
@@ -54,15 +67,22 @@ Steps:
           },
         },
       ],
-    })
+    }),
   );
 
-  server.prompt(
+  server.registerPrompt(
     "build-study-notes",
-    "Read all course materials and build a linked Obsidian vault — one note per topic, with [[wikilinks]] between concepts and a MOC index",
     {
-      courseId: z.string().describe("Course ID (from moodle_list_courses)"),
-      vaultPath: z.string().describe("Absolute path to your Obsidian vault folder, e.g. ~/obsidian/finals"),
+      description:
+        "Read all course materials and build a linked Obsidian vault — one note per topic, with [[wikilinks]] between concepts and a MOC index",
+      argsSchema: z.object({
+        courseId: z.string().describe("Course ID (from moodle_list_courses)"),
+        vaultPath: z
+          .string()
+          .describe(
+            "Absolute path to your Obsidian vault folder, e.g. ~/obsidian/finals",
+          ),
+      }),
     },
     async ({ courseId, vaultPath }) => ({
       messages: [
@@ -75,7 +95,7 @@ Steps:
 Steps:
 1. Call moodle_get_course with courseId=${courseId} to get the course structure
 2. Call moodle_list_resources with courseId=${courseId} to get all files
-3. For each file listed, read it via the MCP resource URI moodle://courses/${courseId}/files/... to get its actual content
+3. For each file listed, call moodle_download_file with its opaque fileId to read the actual content
 4. Call moodle_list_assignments with courseId=${courseId} to get graded work
 5. Call moodle_get_grades with courseId=${courseId} to see grade feedback
 
@@ -90,13 +110,18 @@ The goal: open this vault in Obsidian, enable Graph View, and see the whole cour
           },
         },
       ],
-    })
+    }),
   );
 
-  server.prompt(
+  server.registerPrompt(
     "exam-prep",
-    "Generate a topic-by-topic study guide based on course content, quiz results, and grade feedback",
-    { courseId: z.string().describe("Course ID (from moodle_list_courses)") },
+    {
+      description:
+        "Generate a topic-by-topic study guide based on course content, quiz results, and grade feedback",
+      argsSchema: z.object({
+        courseId: z.string().describe("Course ID (from moodle_list_courses)"),
+      }),
+    },
     async ({ courseId }) => ({
       messages: [
         {
@@ -120,15 +145,22 @@ Produce a study guide:
           },
         },
       ],
-    })
+    }),
   );
 
-  server.prompt(
+  server.registerPrompt(
     "search-notes",
-    "Find all course materials related to a topic using natural language — reads matching files and synthesizes a focused answer",
     {
-      courseId: z.string().describe("Course ID (from moodle_list_courses)"),
-      query: z.string().describe("What you're looking for, e.g. 'derivatives and limits', 'OSI model', 'contrat de travail'"),
+      description:
+        "Find all course materials related to a topic using natural language — reads matching files and synthesizes a focused answer",
+      argsSchema: z.object({
+        courseId: z.string().describe("Course ID (from moodle_list_courses)"),
+        query: z
+          .string()
+          .describe(
+            "What you're looking for, e.g. 'derivatives and limits', 'OSI model', 'contrat de travail'",
+          ),
+      }),
     },
     async ({ courseId, query }) => ({
       messages: [
@@ -142,13 +174,13 @@ Steps:
 1. Call moodle_get_course with courseId=${courseId} to see all section names and module names
 2. Call moodle_list_resources with courseId=${courseId} to see all file names
 3. Look at the section names, module names, and file names — identify which ones are likely to contain information about "${query}" (semantic reasoning, not just keyword match)
-4. For each relevant file, read it via its MCP resource URI moodle://courses/${courseId}/files/...
+4. For each relevant file, call moodle_download_file with its opaque fileId
 5. Synthesize a focused answer about "${query}" from what you found
 
 Format: brief intro, then the key content organized by subtopic, then which files/sections it came from.`,
           },
         },
       ],
-    })
+    }),
   );
 }
