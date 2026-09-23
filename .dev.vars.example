@@ -1,0 +1,9 @@
+# Local-only development; fill the secrets before starting wrangler dev.
+PUBLIC_URL=http://localhost:8787
+ALLOW_INSECURE_HTTP=true
+AUTH_SECRET=
+# Generate with bun run password:hash --workers
+AUTH_PASSWORD_HASH=
+MOODLE_URL=https://your-school.example/moodle
+MOODLE_TOKEN=
+MOODLE_MCP_MAX_FILE_MB=2

@@ -1,0 +1,44 @@
+name: Prepare and validate Workers migration
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: workers-source-migration
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: master
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.4.2'
+      - name: Apply prepared migration once
+        run: |
+          test "$(node -p 'require("./package.json").version')" = '0.4.0'
+          python3 .github/migrations/prepare-workers.py
+          bun install --ignore-scripts
+          bun run format
+          git diff --check
+      - name: Commit generated source and lockfile
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests scripts docs package.json bun.lock tsconfig.json .gitignore README.md SECURITY.md CHANGELOG.md
+          git commit -m 'feat(workers): preserve password OAuth on durable SQLite runtime'
+          git push origin HEAD:master
+          git rev-parse HEAD
+      - run: bun run check
+      - run: bun run test
+      - run: bun run build
+      - run: bun run workers:build
+      - run: bun run workers:test
+      - run: bun audit
