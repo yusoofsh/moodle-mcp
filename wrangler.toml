@@ -9,10 +9,12 @@ minify = true
 PUBLIC_URL = "https://moodle.yusoofsh.workers.dev"
 MOODLE_MCP_MAX_FILE_MB = "2"
 
+# Internal binding/class identifiers must match src/worker.ts. The public Worker
+# name above is independent of these persistent Durable Object identifiers.
 [[durable_objects.bindings]]
-name = "MOODLE"
-class_name = "Moodle"
+name = "MOODLE_MCP"
+class_name = "MoodleMcp"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["Moodle"]
+new_sqlite_classes = ["MoodleMcp"]
