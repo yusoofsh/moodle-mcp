@@ -6,7 +6,7 @@ workers_dev = true
 minify = true
 
 [vars]
-PUBLIC_URL = "https://moodle-mcp.yusoofsh.workers.dev"
+PUBLIC_URL = "https://moodle.yusoofsh.workers.dev"
 MOODLE_MCP_MAX_FILE_MB = "2"
 
 [[durable_objects.bindings]]
