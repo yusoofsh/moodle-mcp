@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { Router, urlencoded, type Request } from "express";
 import {
   createHash,
@@ -7,7 +8,7 @@ import {
 } from "node:crypto";
 import type Provider from "oidc-provider";
 import type { HttpConfig } from "./config.js";
-import type { AuthStore } from "./store.js";
+import type { SqlAuthStore as AuthStore } from "./sql-store.js";
 import { verifyPassword } from "./password.js";
 import { reservePasswordAttempt } from "./password-throttle.js";
 
@@ -53,7 +54,7 @@ export function interactionRouter(
   };
   let passwordCheckInFlight = false;
   const passwordForm = (uid: string, invalid = false): string => {
-    const nonce = randomBytes(32).toString("base64url");
+    const nonce = Buffer.from(randomBytes(32)).toString("base64url");
     store.put("PasswordForm", nonce, { uid }, 600);
     return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Sign in to Moodle MCP</title><body><main><h1>Sign in to Moodle MCP</h1><p>Enter this server's owner password. This is not your Moodle password.</p>${invalid ? '<p role="alert">Incorrect password. Try again.</p>' : ""}<form method="post" action="/interaction/password"><input type="hidden" name="csrf" value="${nonce}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="1024"><button type="submit">Continue</button></form><p>You will review access permissions before authorizing the MCP client.</p></main></body></html>`;
   };
@@ -69,8 +70,8 @@ export function interactionRouter(
         res.type("html").send(passwordForm(details.uid));
         return;
       }
-      const state = randomBytes(32).toString("base64url"),
-        verifier = randomBytes(32).toString("base64url");
+      const state = Buffer.from(randomBytes(32)).toString("base64url"),
+        verifier = Buffer.from(randomBytes(32)).toString("base64url");
       store.put("GithubState", state, { uid: details.uid, verifier }, 600);
       res.cookie(stateCookie, state, cookieOptions);
       const url = new URL("https://github.com/login/oauth/authorize");

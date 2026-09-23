@@ -39,3 +39,7 @@ Password attempt budgets persist in SQLite: five per IP and thirty globally in f
 The internal password-owner identity is bound to the configured hash and AUTH_SECRET. On hash rotation and container recreation, previously issued access and refresh tokens and browser sessions cease to authorize the current owner. Unchanged hashes and storage preserve ordinary restart behavior. Keep the existing AUTH_SECRET and volume during password rotation; do not erase the database. Hashes remain sensitive offline-cracking targets and must not be committed or logged. Password entry intentionally has no MFA; use a strong unique passphrase.
 
 References: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [Node crypto.scrypt](https://nodejs.org/api/crypto.html#cryptoscryptpassword-salt-keylen-options-callback).
+
+## Workers deployment
+
+One named SQLite Durable Object stores encrypted OAuth state and persistent rate budgets. Only the memory-bounded Workers scrypt profile is accepted. Keep the object identity and AUTH_SECRET stable. Free quotas are shared across the account and can cause unavailability; application throttles are not a guarantee against quota exhaustion. Container databases and credentials are not automatically moved or deleted. See docs/CLOUDFLARE.md.

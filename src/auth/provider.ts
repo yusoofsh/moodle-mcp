@@ -1,7 +1,7 @@
 import Provider, { errors, type Configuration } from "oidc-provider";
 import { generateKeyPairSync } from "node:crypto";
 import type { HttpConfig } from "./config.js";
-import type { AuthStore } from "./store.js";
+import type { SqlAuthStore as AuthStore } from "./sql-store.js";
 
 export function createProvider(config: HttpConfig, store: AuthStore): Provider {
   let keys = store.get("SigningKeys", "primary");

@@ -1,3 +1,4 @@
+import { boundedBytes, fetchWithoutRedirect } from "./http.js";
 import type { Config } from "./config.js";
 import { FileIdStore } from "./file-id-store.js";
 
@@ -86,13 +87,12 @@ export class MoodleClient {
       password,
       service: "moodle_mobile_app",
     });
-    const res = await fetch(url, {
+    const res = await fetchWithoutRedirect(url, {
       method: "POST",
       body,
-      redirect: "error",
       signal: AbortSignal.timeout(15000),
     });
-    const text = await res.text();
+    const text = new TextDecoder().decode(await boundedBytes(res, 64 * 1024));
     let data: { token?: string; error?: string };
     try {
       data = JSON.parse(text);
@@ -135,14 +135,15 @@ export class MoodleClient {
         Object.entries(params).map(([k, v]) => [k, String(v)]),
       ),
     });
-    const res = await fetch(url, {
+    const res = await fetchWithoutRedirect(url, {
       method: "POST",
       body,
-      redirect: "error",
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} from Moodle API`);
-    const data = (await res.json()) as T & Partial<MoodleErrorResponse>;
+    const data = JSON.parse(
+      new TextDecoder().decode(await boundedBytes(res, 4 * 1024 * 1024)),
+    ) as T & Partial<MoodleErrorResponse>;
     if (data && typeof data === "object" && data.exception) {
       if (data.errorcode === "webservicesnotenabled") {
         throw new Error(
@@ -202,8 +203,7 @@ export class MoodleClient {
     }
     parsed.searchParams.set("token", this.token);
 
-    const res = await fetch(parsed.toString(), {
-      redirect: "error",
+    const res = await fetchWithoutRedirect(parsed.toString(), {
       signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) throw new Error(`Failed to fetch file: HTTP ${res.status}`);

@@ -55,7 +55,7 @@ describe("security regressions", () => {
     await c.downloadFile(
       "https://school.example/moodle/webservice/pluginfile.php/1",
     );
-    expect(fetcher.mock.calls[0][1].redirect).toBe("error");
+    expect(fetcher.mock.calls[0][1].redirect).toBe("manual");
   });
   it("enforces size while streaming, without relying on Content-Length", async () => {
     const c = await client(3);

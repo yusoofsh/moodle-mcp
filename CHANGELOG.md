@@ -1,3 +1,9 @@
+# 0.5.0 — Cloudflare Workers Free
+
+- Add SQLite Durable Object deployment retaining password OAuth and curated tools.
+- Add Workers-compatible hashing, bounded HTTP and workerd integration tests.
+- Preserve OCI and stdio deployment. No automatic container database migration.
+
 ## 0.4.0 — 2026-09-23
 
 - Add local password owner login inside the existing OAuth/PKCE and consent flow.

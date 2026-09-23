@@ -57,23 +57,25 @@ async function hiddenPassword(): Promise<string> {
 export async function main(args: string[]): Promise<void> {
   if (args.includes("--help")) {
     process.stdout.write(
-      "Usage: node dist/auth/password-cli.js [--stdin]\nDefault: hidden terminal prompt with confirmation. --stdin: read one password from a pipe.\nThe password is never accepted as a command-line argument. Output is an AUTH_PASSWORD_HASH line for .env.\n",
+      "Usage: node dist/auth/password-cli.js [--stdin] [--workers]\nDefault: hidden terminal prompt with confirmation. --stdin: read one password from a pipe.\nThe password is never accepted as a command-line argument. Output is an AUTH_PASSWORD_HASH line. --workers selects a 32 MiB scrypt profile.\n",
     );
     return;
   }
-  if (args.length > 1 || (args.length === 1 && args[0] !== "--stdin"))
+  if (
+    new Set(args).size !== args.length ||
+    args.some((arg) => arg !== "--stdin" && arg !== "--workers")
+  )
     throw new Error(
-      "Only --stdin or --help is supported; never pass the password as an argument",
+      "Only --stdin, --workers or --help is supported; never pass the password as an argument",
     );
-  if (!args.length && !process.stdin.isTTY)
+  if (!args.includes("--stdin") && !process.stdin.isTTY)
     throw new Error(
       "Use an interactive terminal (-it with Docker) or explicitly select --stdin",
     );
-  const password =
-    args[0] === "--stdin"
-      ? await readPasswordInput(process.stdin)
-      : await hiddenPassword();
-  const hash = await hashPassword(password);
+  const password = args.includes("--stdin")
+    ? await readPasswordInput(process.stdin)
+    : await hiddenPassword();
+  const hash = await hashPassword(password, args.includes("--workers"));
   // Colon encoding avoids Compose's dollar-sign interpolation in .env files.
   process.stdout.write(`AUTH_PASSWORD_HASH=${hash}\n`);
 }

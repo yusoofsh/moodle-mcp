@@ -42,3 +42,7 @@ Reviewed against `c1a286f4b9cf6fbad474d3a22e5ae61d1e0d32d2`. Kept the existing T
 - The expanded suite contains 92 tests, including the retained GitHub OAuth tests. Final CI is the source of truth for the full suite, type/build checks, dependency audit, container smoke checks and registry publication.
 
 This is an implementation self-review, not an independent audit. The public HTTPS endpoint and actual ChatGPT/Moodle accounts still require live acceptance after deployment; no user password was requested or generated for deployment.
+
+## Workers migration — 0.5.0
+
+The final GitHub Actions run is the source of truth for the Node suite, Worker bundle, workerd OAuth/persistence tests and OCI publication. The migration uses SQLite changes() rather than Cloudflare row billing counters for replay checks, isolates heavy operations in the Durable Object, and rebuilds forwarding headers from the platform address. No live user credentials were supplied. Workerd tests mock Moodle responses, not OAuth or SQL. oidc-provider targets Node.js upstream; its compatibility warning and operational limits are documented in docs/CLOUDFLARE.md. This is a self-review, not an independent security audit.

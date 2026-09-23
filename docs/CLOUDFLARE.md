@@ -74,18 +74,18 @@ Workers supports password login only. GitHub sign-in remains an optional contain
 
 Free is quota-limited, not unlimited hosting. As checked on 2026-09-23, Workers Free includes 100,000 requests/day and 128 MB memory. SQLite Durable Objects Free includes 100,000 requests/day, 13,000 GB-s/day, 5 million row reads/day, 100,000 row writes/day and 5 GB total storage. Quotas are shared across applications in the account. Exceeding Free limits causes failures; this repository does not enable paid billing. An account already on Paid follows its existing plan.
 
-| Boundary | Application limit |
-| --- | --- |
-| Simultaneous owner-object requests | 2 |
-| Simultaneous password verification | 1 |
-| MCP request body | 128 KiB |
-| Other request body | 16 KiB; login has an additional parser cap |
-| Moodle JSON response | 4 MiB |
-| File download | 2 MiB default, configurable up to 4 MiB |
-| Final HTTP result | 6 MiB |
-| Request budget | 240/minute total, 120/minute per address |
-| Client registration | 50/hour total, 20/hour per address |
-| Password attempts | 5/address and 30 total per 15 minutes |
+| Boundary                           | Application limit                          |
+| ---------------------------------- | ------------------------------------------ |
+| Simultaneous owner-object requests | 2                                          |
+| Simultaneous password verification | 1                                          |
+| MCP request body                   | 128 KiB                                    |
+| Other request body                 | 16 KiB; login has an additional parser cap |
+| Moodle JSON response               | 4 MiB                                      |
+| File download                      | 2 MiB default, configurable up to 4 MiB    |
+| Final HTTP result                  | 6 MiB                                      |
+| Request budget                     | 240/minute total, 120/minute per address   |
+| Client registration                | 50/hour total, 20/hour per address         |
+| Password attempts                  | 5/address and 30 total per 15 minutes      |
 
 Budgets persist across eviction. They can temporarily block legitimate sign-in during an attack and do not guarantee remaining platform quota. Large accounts or files can exceed the caps and are rejected, not silently reported as complete. Existing Moodle pagination and document-extraction limitations remain.
 

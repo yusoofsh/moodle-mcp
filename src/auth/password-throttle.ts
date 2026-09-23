@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import type { AuthStore } from "./store.js";
+import type { SqlAuthStore as AuthStore } from "./sql-store.js";
 
 const WINDOW = 15 * 60;
 /** Persistent fixed-window budgets, reserved synchronously before any scrypt work.

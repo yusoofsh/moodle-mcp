@@ -1,5 +1,9 @@
 # Moodle MCP — OAuth + OCI fork
 
+## Cloudflare Workers Free — 0.5.0
+
+The password/OAuth application can now run in a SQLite-backed Durable Object without Docker or a VPS. See [the Workers deployment and migration guide](docs/CLOUDFLARE.md). All 14 read-only Moodle tools remain, subject to Moodle permissions and Worker-specific limits. Generate a compatible hash with `bun run password:hash --workers`. Container support below is retained.
+
 Read-only access to your Moodle account from ChatGPT or another MCP client, without installing a Moodle plugin. This MIT-licensed fork of [1alexandrer/moodle-mcp](https://github.com/1alexandrer/moodle-mcp) adds a container-hosted OAuth authorization server and hardens remote access.
 
 **Current scope:** single Moodle account, one password-authenticated owner (or an explicitly selected GitHub owner), 14 student-facing tools. This is an OAuth/OCI foundation release, not complete Moodle API coverage. [Triage and follow-up work](docs/TRIAGE.md) · [Review record](docs/REVIEW.md) · [Security model](SECURITY.md).
@@ -149,7 +153,7 @@ Node.js 24 is required for the HTTP runtime and its built-in SQLite module. The 
 
 For local HTTP experiments only, use `PUBLIC_URL=http://localhost:3000`, `ALLOW_INSECURE_HTTP=true`, `TRUST_PROXY_HOPS=0` and a writable database path. Non-loopback HTTP is rejected.
 
-For an on-machine stdio MCP client, use `node dist/server.js` with Moodle credentials in its environment. OAuth protects the remote HTTP boundary, not local stdio. The inherited Cloudflare Worker is a separate legacy transport: it now fails closed unless an independent `MCP_ACCESS_TOKEN` of at least 32 characters is supplied. It is not the OAuth container deployment.
+For an on-machine stdio MCP client, use `node dist/server.js` with Moodle credentials in its environment. OAuth protects the remote HTTP boundary, not local stdio. The Cloudflare Worker now uses password OAuth and persistent Durable Object SQLite; see docs/CLOUDFLARE.md. MCP_ACCESS_TOKEN no longer applies.
 
 ## Verification and references
 

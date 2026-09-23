@@ -45,3 +45,7 @@ Baseline: `c1a286f4b9cf6fbad474d3a22e5ae61d1e0d32d2`, on `master`. This change a
 | P2       | Published container must work without a GitHub application                | Password-mode image smoke test generates its own test hash and checks discovery/non-root/401 behavior                                   |
 
 No live Moodle credentials, deployment origin or user password are stored in the repository. The earlier student-feature backlog remains open.
+
+## Workers migration — 0.5.0
+
+Split Node-only database construction from the encrypted adapter. Reuse Express, oidc-provider and all curated tools inside SQLite Durable Objects. Add fixed 32 MiB scrypt profile, manual redirect rejection, response bounds and persistent HTTP budgets. Keep OCI/stdio support. Live Moodle acceptance, pagination, document extraction and CIMD remain separate follow-up work.

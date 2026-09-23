@@ -19,3 +19,9 @@ build_vault.py
 *.sqlite-shm
 *.sqlite-wal
 coverage/
+
+# Local Workers secrets and bundles.
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
