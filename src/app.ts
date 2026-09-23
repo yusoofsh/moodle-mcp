@@ -157,14 +157,12 @@ export function createApp(
         ? _err.status
         : 500;
     if (!res.headersSent)
-      res
-        .status(status)
-        .json({
-          error:
-            status === 500
-              ? "Request failed; check configuration and upstream availability"
-              : "Invalid or oversized request",
-        });
+      res.status(status).json({
+        error:
+          status === 500
+            ? "Request failed; check configuration and upstream availability"
+            : "Invalid or oversized request",
+      });
   };
   app.use(errors);
   const cleanup = setInterval(() => store.cleanup(), 3600000);

@@ -29,18 +29,16 @@ beforeEach(() => {
     );
   moodle = vi.fn().mockImplementation(async () => {
     const original = globalThis.fetch;
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            userid: 42,
-            sitename: "Test",
-            fullname: "Student",
-            functions: [],
-          }),
-        ),
-      );
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          userid: 42,
+          sitename: "Test",
+          fullname: "Student",
+          functions: [],
+        }),
+      ),
+    );
     try {
       return await MoodleClient.create({
         baseUrl: "https://school.example",
