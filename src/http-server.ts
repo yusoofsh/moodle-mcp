@@ -4,8 +4,8 @@ import { createApp } from "./app.js";
 
 try {
   const config = getHttpConfig();
-  getConfig(); // Fail closed on incomplete Moodle configuration; do not contact Moodle until authorized.
-  const runtime = createApp(config);
+  const moodleConfig = getConfig(config.authMode === "password");
+  const runtime = createApp(config, { moodleConfig });
   const http = runtime.app.listen(config.port, "0.0.0.0", () =>
     console.log(
       `Moodle MCP listening on port ${config.port}; public endpoint ${config.publicUrl}/mcp`,

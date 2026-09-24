@@ -4,6 +4,9 @@ import { rateLimit } from "express-rate-limit";
 import { requireBearerAuth } from "@modelcontextprotocol/express";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { McpServer, OAuthError } from "@modelcontextprotocol/server";
+import { MoodleConnection, type MoodleFactory } from "./connect/connection.js";
+import { moodleConnectionRouter } from "./connect/router.js";
+import type { Config } from "./config.js";
 import { getConfig } from "./config.js";
 import { MoodleClient } from "./moodle-client.js";
 import { registerAllTools } from "./register-tools.js";
@@ -19,6 +22,8 @@ export function createAppWithStore(
   store: SqlAuthStore,
   dependencies: {
     githubFetch?: Fetcher;
+    moodleConfig?: Config;
+    moodleFactory?: MoodleFactory;
     createMoodleClient?: () => Promise<MoodleClient>;
     backgroundCleanup?: boolean;
     disableHttpRateLimits?: boolean;
@@ -130,8 +135,18 @@ export function createAppWithStore(
     },
     authenticate,
   );
+  const connection = dependencies.moodleConfig
+    ? new MoodleConnection(
+        store,
+        dependencies.moodleConfig,
+        dependencies.moodleFactory,
+      )
+    : undefined;
+  if (connection && config.authMode === "password")
+    app.use(moodleConnectionRouter(config, store, connection));
   let pending: Promise<MoodleClient> | undefined;
   const getClient = (): Promise<MoodleClient> => {
+    if (connection) return connection.getClient();
     if (!pending)
       pending = (
         dependencies.createMoodleClient?.() || MoodleClient.create(getConfig())
@@ -142,7 +157,7 @@ export function createAppWithStore(
     return pending;
   };
   app.post("/mcp", express.json({ limit: "1mb" }), async (req, res) => {
-    const server = new McpServer({ name: "moodle-mcp", version: "0.5.0" });
+    const server = new McpServer({ name: "moodle-mcp", version: "0.6.0" });
     registerAllTools(server, getClient);
     registerResources(server, getClient);
     registerPrompts(server);
@@ -181,6 +196,7 @@ export function createAppWithStore(
     app,
     provider,
     store,
+    connection,
     close: () => {
       if (cleanup) clearInterval(cleanup);
       store.close();

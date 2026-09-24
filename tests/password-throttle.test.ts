@@ -1,3 +1,4 @@
+import { acquirePasswordSlot } from "../src/auth/password-slot.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -57,4 +58,16 @@ describe("password helper input", () => {
     }
     await expect(readPasswordInput(input())).rejects.toThrow(/exceeds/);
   });
+});
+
+it("shares a password slot and releases it only once", () => {
+  const scope = {};
+  const release = acquirePasswordSlot(scope)!;
+  expect(acquirePasswordSlot(scope)).toBeUndefined();
+  release();
+  const next = acquirePasswordSlot(scope)!;
+  release();
+  expect(acquirePasswordSlot(scope)).toBeUndefined();
+  next();
+  expect(acquirePasswordSlot(scope)).toBeTypeOf("function");
 });

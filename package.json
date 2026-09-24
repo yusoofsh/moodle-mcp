@@ -1,6 +1,6 @@
 {
   "name": "@yusoofsh/moodle-mcp",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Read-only Moodle MCP with password OAuth for Cloudflare Workers Free and OCI",
   "type": "module",
   "bin": {
@@ -27,7 +27,8 @@
     "workers:dev": "wrangler dev",
     "workers:deploy": "wrangler deploy",
     "workers:test": "node scripts/test-workers.mjs",
-    "workers:test:browser": "node scripts/test-workers.mjs --browser"
+    "workers:test:browser": "node scripts/test-workers.mjs --browser",
+    "workers:test:sso": "node scripts/test-sso-workers.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",

@@ -4,7 +4,6 @@ import { createServer } from "node:http";
 import { isIP } from "node:net";
 import { createAppWithStore } from "./app-core.js";
 import { SqlAuthStore } from "./auth/sql-store.js";
-import { MoodleClient } from "./moodle-client.js";
 import { DurableSqlDatabase } from "./workers/sql-database.js";
 import { workerConfig, type WorkerEnv } from "./workers/config.js";
 import { reserveHttpRequest } from "./workers/limits.js";
@@ -21,6 +20,21 @@ const fail = (status: number, message: string, retry?: number) =>
     },
   });
 const paths = new Set([
+  ...[
+    "",
+    "/login",
+    "/client.js",
+    "/return",
+    "/status",
+    "/start",
+    "/complete",
+    "/confirm",
+    "/cancel",
+    "/disconnect",
+    "/fallback",
+    "/check",
+    "/logout",
+  ].map((path) => "/connect/moodle" + path),
   "/healthz",
   "/mcp",
   "/interaction",
@@ -58,7 +72,7 @@ export class MoodleMcp extends DurableObject<WorkerEnv> {
       const runtime = createAppWithStore(http, store, {
         backgroundCleanup: false,
         disableHttpRateLimits: true,
-        createMoodleClient: () => MoodleClient.create(moodle),
+        moodleConfig: moodle,
       });
       const server = createServer(runtime.app);
       await new Promise<void>((resolve, reject) => {
@@ -120,12 +134,7 @@ export default {
       return fail(404, "Not found");
     if (!env.PUBLIC_URL || url.origin !== env.PUBLIC_URL)
       return fail(421, "Use the configured PUBLIC_URL origin");
-    if (
-      !env.AUTH_SECRET ||
-      !env.AUTH_PASSWORD_HASH ||
-      !env.MOODLE_TOKEN ||
-      !env.MOODLE_URL
-    )
+    if (!env.AUTH_SECRET || !env.AUTH_PASSWORD_HASH || !env.MOODLE_URL)
       return fail(503, "Configure the required Worker secrets");
     const headers = new Headers(request.headers),
       address = headers.get("CF-Connecting-IP") ?? "";

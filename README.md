@@ -165,3 +165,13 @@ CI checks formatting, TypeScript, the test suite, dependency advisories, a nativ
 - [GitHub OAuth web application flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps)
 
 The original MIT license and attribution are retained. No code from differently or ambiguously licensed Moodle MCP projects has been copied into this fork.
+
+## University Google SSO (student onboarding)
+
+In password/Workers mode, open `/connect/moodle` to connect through your
+university’s existing Moodle mobile SSO. Use desktop Firefox or Chrome, allow
+the browser return handler, sign in at the university, and explicitly confirm
+the returned Moodle account. No new Google OAuth app is required.
+`MOODLE_TOKEN` remains an optional fallback; a confirmed SSO credential is stored
+encrypted. See [setup, security boundaries, and browser limitations](docs/SSO-ONBOARDING.md).
+The institution’s final custom-scheme handoff requires a live user acceptance test.

@@ -43,3 +43,14 @@ References: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatshe
 ## Workers deployment
 
 One named SQLite Durable Object stores encrypted OAuth state and persistent rate budgets. Only the memory-bounded Workers scrypt profile is accepted. Keep the object identity and AUTH_SECRET stable. Free quotas are shared across the account and can cause unavailability; application throttles are not a guarantee against quota exhaustion. Container databases and credentials are not automatically moved or deleted. See docs/CLOUDFLARE.md.
+
+## Moodle SSO connection management
+
+The owner-only `/connect/moodle` surface has a separate short-lived setup session;
+MCP access tokens do not grant configuration rights. Pairing and candidate tokens
+are one-use, encrypted, session-bound, expiring records. The final account must be
+confirmed and later reconnections must match its pinned Moodle ID. Browser handler
+returns use URL fragments cleared before a CSRF-protected POST; query-token returns
+are rejected. The optional mobile private token is discarded. Disconnect never
+revokes the official mobile app token. See [SSO onboarding](docs/SSO-ONBOARDING.md)
+for the callback threat model, credential precedence and acceptance-test limits.

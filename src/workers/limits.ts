@@ -22,7 +22,7 @@ export function reserveHttpRequest(
       { key: "registration", window: 3600, limit: 50 },
       { key: `registration:${ip}`, window: 3600, limit: 20 },
     );
-  if (path.startsWith("/interaction"))
+  if (path.startsWith("/interaction") || path.startsWith("/connect/moodle"))
     budgets.push({ key: `interaction:${ip}`, window: 60, limit: 30 });
   const counters = budgets.map((b) => {
     const old = store.get("HttpBudget", b.key);

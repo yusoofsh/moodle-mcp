@@ -61,3 +61,13 @@ capabilities remain enforced at invocation, with a diagnostic error for unavaila
 functions. Direct initialized/stdio registration preserves its existing filtering.
 Tests cover authenticated outage discovery, missing capabilities, recovery, strict
 JSON tool schemas, OAuth enforcement and the official Streamable HTTP client.
+
+## 0.6.0 — student SSO onboarding
+
+Implemented owner-only connection management, optional environment-token fallback,
+validated mobile SSO initiation, fragment callback handling, account confirmation,
+pinned identity, encrypted token storage and cache invalidation. Password login,
+CSRF, replay, expiry, cancellation races and restart behavior have regression tests.
+Chromium/Firefox validate the setup page with a synthetic return; the institution
+may force its official app scheme. Real Google/SiberMu callback acceptance remains
+a user-side check rather than a claimed automated test.

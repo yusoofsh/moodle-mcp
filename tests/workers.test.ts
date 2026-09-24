@@ -49,6 +49,11 @@ describe("Workers portability and limits", () => {
     );
     expect(await verifyPassword("wrong", encoded)).toBe(false);
   });
+  it("permits onboarding without an environment Moodle token", () => {
+    expect(
+      workerConfig({ ...env, MOODLE_TOKEN: undefined }).moodle.token,
+    ).toBeUndefined();
+  });
   it("requires the Workers profile and HTTPS Moodle", () => {
     expect(workerConfig(env).moodle.maxFileBytes).toBe(2 * 1024 * 1024);
     expect(() =>

@@ -31,6 +31,7 @@ jobs:
       - name: Install browser regression runtimes
         run: bunx --no-install playwright install --with-deps chromium firefox
       - run: bun run workers:test:browser
+      - run: bun run workers:test:sso
       - run: bun audit
       - name: Build and smoke-test the container
         shell: bash

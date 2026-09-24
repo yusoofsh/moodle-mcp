@@ -26,8 +26,7 @@ export function workerConfig(env: WorkerEnv): {
   });
   if (!http.passwordHash?.startsWith(`${WORKERS_PASSWORD_PREFIX}:`))
     throw new Error("Generate a Workers hash with password:hash --workers");
-  if (!env.MOODLE_URL || !env.MOODLE_TOKEN?.trim())
-    throw new Error("Moodle configuration is required");
+  if (!env.MOODLE_URL) throw new Error("Moodle configuration is required");
   if (new URL(env.MOODLE_URL).protocol !== "https:")
     throw new Error("Moodle must use HTTPS");
   const mb = parseMaxFileMb(env.MOODLE_MCP_MAX_FILE_MB ?? "2");
@@ -38,7 +37,7 @@ export function workerConfig(env: WorkerEnv): {
     http,
     moodle: {
       baseUrl: normalizeUrl(env.MOODLE_URL),
-      token: env.MOODLE_TOKEN.trim(),
+      token: env.MOODLE_TOKEN?.trim() || undefined,
       maxFileBytes,
     },
   };

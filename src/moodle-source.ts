@@ -1,3 +1,4 @@
+import { NOT_CONNECTED } from "./connect/connection.js";
 import type { MoodleClient } from "./moodle-client.js";
 
 /** Remote discovery accepts a factory; an already connected stdio client still works. */
@@ -13,6 +14,7 @@ export async function resolveMoodleClient(
     // Only our fixed validation messages are safe to surface. Never forward a
     // network exception, response body, URL, or credentials from a failed factory.
     const known = new Set([
+      NOT_CONNECTED,
       "Invalid Moodle token. Check your MOODLE_TOKEN value.",
       "Web services are not enabled on this Moodle server. Contact your IT department to enable them.",
       "Moodle did not return a valid user ID",

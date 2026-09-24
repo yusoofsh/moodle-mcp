@@ -11,6 +11,7 @@ import helmet from "helmet";
 import { consentCallbackOrigin } from "./consent-policy.js";
 import type { HttpConfig } from "./config.js";
 import type { SqlAuthStore as AuthStore } from "./sql-store.js";
+import { acquirePasswordSlot } from "./password-slot.js";
 import { verifyPassword } from "./password.js";
 import { reservePasswordAttempt } from "./password-throttle.js";
 
@@ -54,7 +55,6 @@ export function interactionRouter(
     path: "/",
     maxAge: 600000,
   };
-  let passwordCheckInFlight = false;
   const passwordForm = (uid: string, invalid = false): string => {
     const nonce = Buffer.from(randomBytes(32)).toString("base64url");
     store.put("PasswordForm", nonce, { uid }, 600);
@@ -164,7 +164,8 @@ export function interactionRouter(
           .send("Expired or mismatched login form; restart sign-in");
         return;
       }
-      if (passwordCheckInFlight) {
+      const releasePassword = acquirePasswordSlot(store);
+      if (!releasePassword) {
         res
           .status(429)
           .set("Retry-After", "1")
@@ -177,13 +178,13 @@ export function interactionRouter(
         req.ip || "unknown",
       );
       if (retry) {
+        releasePassword();
         res
           .status(429)
           .set("Retry-After", String(retry))
           .send("Too many login attempts; try again later");
         return;
       }
-      passwordCheckInFlight = true;
       // Remove the submitted password from req.body before other middleware could
       // observe it. Never include it in state, logs, errors or OAuth credentials.
       try {
@@ -198,7 +199,7 @@ export function interactionRouter(
           { mergeWithLastSubmission: false },
         );
       } finally {
-        passwordCheckInFlight = false;
+        releasePassword();
       }
     },
   );

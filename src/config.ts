@@ -43,7 +43,7 @@ export function normalizeUrl(raw: string): string {
   }
 }
 
-export function getConfig(): Config {
+export function getConfig(allowUnconnected = false): Config {
   const rawUrl = process.env.MOODLE_URL;
   if (!rawUrl) throw new Error("MOODLE_URL environment variable is required");
 
@@ -52,7 +52,7 @@ export function getConfig(): Config {
   const username = process.env.MOODLE_USERNAME;
   const password = process.env.MOODLE_PASSWORD;
 
-  if (!token && (!username || !password)) {
+  if (!allowUnconnected && !token && (!username || !password)) {
     throw new Error(
       "Set either MOODLE_TOKEN or both MOODLE_USERNAME and MOODLE_PASSWORD",
     );

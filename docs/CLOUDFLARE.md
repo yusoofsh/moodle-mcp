@@ -131,3 +131,12 @@ The OCI workflow also runs Workers tests before publication. The separate manual
 - https://developers.cloudflare.com/workers/runtime-apis/nodejs/http/
 - https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/
 - https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+
+## Student SSO onboarding (0.6.0)
+
+`MOODLE_TOKEN` is no longer a startup requirement. Existing configured credentials
+remain intact and are used until a new SSO connection is explicitly confirmed.
+Open `/connect/moodle` with the existing owner passphrase and follow
+[the desktop-browser SSO guide](SSO-ONBOARDING.md). The university login itself
+is performed by the owner. No new binding, migration, Google app, or billing
+change is needed. An explicit disconnect also disables fallback until reselected.
