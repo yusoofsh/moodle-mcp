@@ -1,4 +1,8 @@
 import type { MoodleClient } from "./moodle-client.js";
+import {
+  resolveMoodleClient,
+  type MoodleClientSource,
+} from "./moodle-source.js";
 export const READ_ONLY = {
   readOnlyHint: true,
   destructiveHint: false,
@@ -30,7 +34,31 @@ export const TOOL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_get_forum_discussions: ["mod_forum_get_forum_discussions"],
   moodle_get_notifications: ["message_popup_get_popup_notifications"],
 };
-export function canRegister(client: MoodleClient, name: string): boolean {
-  const required = TOOL_FUNCTIONS[name];
-  return required !== undefined && required.every((fn) => client.supports(fn));
+export function canRegister(client: MoodleClientSource, name: string): boolean {
+  const required = Object.hasOwn(TOOL_FUNCTIONS, name)
+    ? TOOL_FUNCTIONS[name]
+    : undefined;
+  return (
+    required !== undefined &&
+    (typeof client === "function" ||
+      required.every((fn) => client.supports(fn)))
+  );
+}
+
+/** Catalog entries are static for remote clients; capability checks are per call. */
+export async function getToolClient(
+  source: MoodleClientSource,
+  name: string,
+): Promise<MoodleClient> {
+  const required = Object.hasOwn(TOOL_FUNCTIONS, name)
+    ? TOOL_FUNCTIONS[name]
+    : undefined;
+  if (!required) throw new Error("Unknown Moodle tool");
+  const client = await resolveMoodleClient(source);
+  const missing = required.filter((fn) => !client.supports(fn));
+  if (missing.length)
+    throw new Error(
+      `This Moodle token does not advertise the required Web Service functions: ${missing.join(", ")}. Check the token's service permissions; the tool catalog does not grant additional access.`,
+    );
+  return client;
 }

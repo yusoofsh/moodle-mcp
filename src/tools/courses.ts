@@ -1,4 +1,10 @@
-import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
+import type { MoodleClientSource } from "../moodle-source.js";
+import {
+  canRegister,
+  getToolClient,
+  READ_ONLY,
+  AUTH_META,
+} from "../tool-policy.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
@@ -63,9 +69,9 @@ export async function getCourse(
 
 export function registerCourseTools(
   server: McpServer,
-  client: MoodleClient,
+  source: MoodleClientSource,
 ): void {
-  if (canRegister(client, "moodle_list_courses"))
+  if (canRegister(source, "moodle_list_courses"))
     server.registerTool(
       "moodle_list_courses",
       {
@@ -74,12 +80,15 @@ export function registerCourseTools(
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async () => ({
-        content: [{ type: "text" as const, text: await listCourses(client) }],
-      }),
+      async () => {
+        const client = await getToolClient(source, "moodle_list_courses");
+        return {
+          content: [{ type: "text" as const, text: await listCourses(client) }],
+        };
+      },
     );
 
-  if (canRegister(client, "moodle_get_course"))
+  if (canRegister(source, "moodle_get_course"))
     server.registerTool(
       "moodle_get_course",
       {
@@ -91,10 +100,13 @@ export function registerCourseTools(
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ courseId }) => ({
-        content: [
-          { type: "text" as const, text: await getCourse(client, courseId) },
-        ],
-      }),
+      async ({ courseId }) => {
+        const client = await getToolClient(source, "moodle_get_course");
+        return {
+          content: [
+            { type: "text" as const, text: await getCourse(client, courseId) },
+          ],
+        };
+      },
     );
 }

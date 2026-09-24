@@ -1,4 +1,10 @@
-import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
+import type { MoodleClientSource } from "../moodle-source.js";
+import {
+  canRegister,
+  getToolClient,
+  READ_ONLY,
+  AUTH_META,
+} from "../tool-policy.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
@@ -74,9 +80,9 @@ export async function reauthorize(
 
 export function registerDownloadTool(
   server: McpServer,
-  client: MoodleClient,
+  source: MoodleClientSource,
 ): void {
-  if (canRegister(client, "moodle_download_file"))
+  if (canRegister(source, "moodle_download_file"))
     server.registerTool(
       "moodle_download_file",
       {
@@ -91,6 +97,8 @@ export function registerDownloadTool(
         _meta: AUTH_META,
       },
       async ({ fileId }) => {
+        const client = await getToolClient(source, "moodle_download_file");
+
         const ref = await client.fileIdStore.open(fileId, client.userId);
         if (!ref) {
           return {

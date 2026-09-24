@@ -1,4 +1,10 @@
-import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
+import type { MoodleClientSource } from "../moodle-source.js";
+import {
+  canRegister,
+  getToolClient,
+  READ_ONLY,
+  AUTH_META,
+} from "../tool-policy.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
@@ -99,9 +105,9 @@ export async function getGrades(
 
 export function registerGradeTools(
   server: McpServer,
-  client: MoodleClient,
+  source: MoodleClientSource,
 ): void {
-  if (canRegister(client, "moodle_get_grades"))
+  if (canRegister(source, "moodle_get_grades"))
     server.registerTool(
       "moodle_get_grades",
       {
@@ -113,10 +119,13 @@ export function registerGradeTools(
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ courseId }) => ({
-        content: [
-          { type: "text" as const, text: await getGrades(client, courseId) },
-        ],
-      }),
+      async ({ courseId }) => {
+        const client = await getToolClient(source, "moodle_get_grades");
+        return {
+          content: [
+            { type: "text" as const, text: await getGrades(client, courseId) },
+          ],
+        };
+      },
     );
 }

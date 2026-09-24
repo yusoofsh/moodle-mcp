@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/server";
-import type { MoodleClient } from "./moodle-client.js";
+import type { MoodleClientSource } from "./moodle-source.js";
 import { registerCourseTools } from "./tools/courses.js";
 import { registerFileTools } from "./tools/files.js";
 import { registerDownloadTool } from "./tools/download.js";
@@ -13,7 +13,7 @@ import { registerSiteInfoTool } from "./tools/siteinfo.js";
 
 export function registerAllTools(
   server: McpServer,
-  client: MoodleClient,
+  client: MoodleClientSource,
 ): void {
   registerCourseTools(server, client);
   registerFileTools(server, client);

@@ -1,4 +1,10 @@
-import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
+import type { MoodleClientSource } from "../moodle-source.js";
+import {
+  canRegister,
+  getToolClient,
+  READ_ONLY,
+  AUTH_META,
+} from "../tool-policy.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
@@ -99,9 +105,9 @@ export async function getForumDiscussions(
 
 export function registerForumTools(
   server: McpServer,
-  client: MoodleClient,
+  source: MoodleClientSource,
 ): void {
-  if (canRegister(client, "moodle_list_forums"))
+  if (canRegister(source, "moodle_list_forums"))
     server.registerTool(
       "moodle_list_forums",
       {
@@ -113,14 +119,17 @@ export function registerForumTools(
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ courseId }) => ({
-        content: [
-          { type: "text" as const, text: await listForums(client, courseId) },
-        ],
-      }),
+      async ({ courseId }) => {
+        const client = await getToolClient(source, "moodle_list_forums");
+        return {
+          content: [
+            { type: "text" as const, text: await listForums(client, courseId) },
+          ],
+        };
+      },
     );
 
-  if (canRegister(client, "moodle_get_forum_discussions"))
+  if (canRegister(source, "moodle_get_forum_discussions"))
     server.registerTool(
       "moodle_get_forum_discussions",
       {
@@ -132,13 +141,19 @@ export function registerForumTools(
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ forumId }) => ({
-        content: [
-          {
-            type: "text" as const,
-            text: await getForumDiscussions(client, forumId),
-          },
-        ],
-      }),
+      async ({ forumId }) => {
+        const client = await getToolClient(
+          source,
+          "moodle_get_forum_discussions",
+        );
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: await getForumDiscussions(client, forumId),
+            },
+          ],
+        };
+      },
     );
 }

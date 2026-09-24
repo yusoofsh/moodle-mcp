@@ -49,3 +49,15 @@ No live Moodle credentials, deployment origin or user password are stored in the
 ## Workers migration — 0.5.0
 
 Split Node-only database construction from the encrypted adapter. Reuse Express, oidc-provider and all curated tools inside SQLite Durable Objects. Add fixed 32 MiB scrypt profile, manual redirect rejection, response bounds and persistent HTTP budgets. Keep OCI/stdio support. Live Moodle acceptance, pagination, document extraction and CIMD remain separate follow-up work.
+
+## September 24 tool-discovery regression
+
+Remote initialization previously called Moodle before constructing the MCP server.
+A rejected token or upstream failure therefore returned HTTP 500 for discovery;
+capability filtering could also hide most tools. Remote registration now accepts a
+lazy client source and publishes the curated 14-tool catalog without a Moodle call.
+The earlier P2 capability-registration decision is superseded for HTTP/Workers:
+capabilities remain enforced at invocation, with a diagnostic error for unavailable
+functions. Direct initialized/stdio registration preserves its existing filtering.
+Tests cover authenticated outage discovery, missing capabilities, recovery, strict
+JSON tool schemas, OAuth enforcement and the official Streamable HTTP client.

@@ -1,4 +1,10 @@
-import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
+import type { MoodleClientSource } from "../moodle-source.js";
+import {
+  canRegister,
+  getToolClient,
+  READ_ONLY,
+  AUTH_META,
+} from "../tool-policy.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
@@ -137,9 +143,9 @@ export async function getQuizAttempts(
 
 export function registerQuizTools(
   server: McpServer,
-  client: MoodleClient,
+  source: MoodleClientSource,
 ): void {
-  if (canRegister(client, "moodle_list_quizzes"))
+  if (canRegister(source, "moodle_list_quizzes"))
     server.registerTool(
       "moodle_list_quizzes",
       {
@@ -151,14 +157,20 @@ export function registerQuizTools(
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ courseId }) => ({
-        content: [
-          { type: "text" as const, text: await listQuizzes(client, courseId) },
-        ],
-      }),
+      async ({ courseId }) => {
+        const client = await getToolClient(source, "moodle_list_quizzes");
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: await listQuizzes(client, courseId),
+            },
+          ],
+        };
+      },
     );
 
-  if (canRegister(client, "moodle_get_quiz_attempts"))
+  if (canRegister(source, "moodle_get_quiz_attempts"))
     server.registerTool(
       "moodle_get_quiz_attempts",
       {
@@ -170,13 +182,16 @@ export function registerQuizTools(
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ quizId }) => ({
-        content: [
-          {
-            type: "text" as const,
-            text: await getQuizAttempts(client, quizId),
-          },
-        ],
-      }),
+      async ({ quizId }) => {
+        const client = await getToolClient(source, "moodle_get_quiz_attempts");
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: await getQuizAttempts(client, quizId),
+            },
+          ],
+        };
+      },
     );
 }

@@ -1,4 +1,10 @@
-import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
+import type { MoodleClientSource } from "../moodle-source.js";
+import {
+  canRegister,
+  getToolClient,
+  READ_ONLY,
+  AUTH_META,
+} from "../tool-policy.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
@@ -83,9 +89,9 @@ export async function getCalendarEvents(
 
 export function registerCalendarTools(
   server: McpServer,
-  client: MoodleClient,
+  source: MoodleClientSource,
 ): void {
-  if (canRegister(client, "moodle_get_calendar_events"))
+  if (canRegister(source, "moodle_get_calendar_events"))
     server.registerTool(
       "moodle_get_calendar_events",
       {
@@ -104,13 +110,19 @@ export function registerCalendarTools(
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ courseId, daysAhead }) => ({
-        content: [
-          {
-            type: "text" as const,
-            text: await getCalendarEvents(client, courseId, daysAhead),
-          },
-        ],
-      }),
+      async ({ courseId, daysAhead }) => {
+        const client = await getToolClient(
+          source,
+          "moodle_get_calendar_events",
+        );
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: await getCalendarEvents(client, courseId, daysAhead),
+            },
+          ],
+        };
+      },
     );
 }

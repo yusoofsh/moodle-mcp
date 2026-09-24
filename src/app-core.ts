@@ -142,10 +142,9 @@ export function createAppWithStore(
     return pending;
   };
   app.post("/mcp", express.json({ limit: "1mb" }), async (req, res) => {
-    const client = await getClient();
     const server = new McpServer({ name: "moodle-mcp", version: "0.5.0" });
-    registerAllTools(server, client);
-    registerResources(server, client);
+    registerAllTools(server, getClient);
+    registerResources(server, getClient);
     registerPrompts(server);
     const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,

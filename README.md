@@ -120,7 +120,7 @@ Password attempts are limited to **5 per IP per 15 minutes** and **30 total per 
 
 ## Available tools
 
-Tools are advertised only when Moodle reports their required web-service functions. Missing permissions do not become available merely because this server implements a tool.
+Authenticated HTTP/Workers discovery returns a stable catalog of 14 read-only tools without contacting Moodle. The connection and required web-service capabilities are checked when each tool runs, so a university outage or invalid Moodle token cannot hide the tool list. `moodle_get_site_info` reports availability for the configured token. Already-connected stdio clients still filter the list by reported capabilities. Advertising a tool never grants Moodle permissions.
 
 | Tool                                                 | Function                                                        |
 | ---------------------------------------------------- | --------------------------------------------------------------- |

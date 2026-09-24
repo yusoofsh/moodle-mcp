@@ -1,4 +1,10 @@
-import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
+import type { MoodleClientSource } from "../moodle-source.js";
+import {
+  canRegister,
+  getToolClient,
+  READ_ONLY,
+  AUTH_META,
+} from "../tool-policy.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
@@ -98,9 +104,9 @@ async function listResources(
 
 export function registerFileTools(
   server: McpServer,
-  client: MoodleClient,
+  source: MoodleClientSource,
 ): void {
-  if (canRegister(client, "moodle_list_resources"))
+  if (canRegister(source, "moodle_list_resources"))
     server.registerTool(
       "moodle_list_resources",
       {
@@ -112,13 +118,16 @@ export function registerFileTools(
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ courseId }) => ({
-        content: [
-          {
-            type: "text" as const,
-            text: await listResources(client, courseId),
-          },
-        ],
-      }),
+      async ({ courseId }) => {
+        const client = await getToolClient(source, "moodle_list_resources");
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: await listResources(client, courseId),
+            },
+          ],
+        };
+      },
     );
 }

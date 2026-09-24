@@ -1,13 +1,19 @@
+import type { MoodleClientSource } from "../moodle-source.js";
 import { z } from "zod";
-import { canRegister, READ_ONLY, AUTH_META } from "../tool-policy.js";
+import {
+  canRegister,
+  getToolClient,
+  TOOL_FUNCTIONS,
+  READ_ONLY,
+  AUTH_META,
+} from "../tool-policy.js";
 import type { McpServer } from "@modelcontextprotocol/server";
-import type { MoodleClient } from "../moodle-client.js";
 
 export function registerSiteInfoTool(
   server: McpServer,
-  client: MoodleClient,
+  source: MoodleClientSource,
 ): void {
-  if (canRegister(client, "moodle_get_site_info"))
+  if (canRegister(source, "moodle_get_site_info"))
     server.registerTool(
       "moodle_get_site_info",
       {
@@ -18,6 +24,8 @@ export function registerSiteInfoTool(
         _meta: AUTH_META,
       },
       async () => {
+        const client = await getToolClient(source, "moodle_get_site_info");
+
         const enabledCount = client.supportedFunctions.size;
         const lines = [
           `## Moodle Site Info`,
@@ -25,55 +33,19 @@ export function registerSiteInfoTool(
           `**School:** ${client.siteName}`,
           `**Version:** ${client.release}`,
           `**Your user ID:** ${client.userId}`,
-          `**Enabled WS functions:** ${enabledCount > 0 ? enabledCount : "Unknown (server did not report)"}`,
+          `**Enabled WS functions:** ${client.profile?.functions === undefined ? "Unknown (server did not report)" : enabledCount}`,
         ];
 
-        if (enabledCount > 0) {
-          const toolStatus = [
-            {
-              name: "moodle_list_assignments",
-              fn: "mod_assign_get_assignments",
-            },
-            {
-              name: "moodle_get_assignment",
-              fn: "mod_assign_get_submission_status",
-            },
-            {
-              name: "moodle_get_grades",
-              fn: "gradereport_user_get_grade_items",
-            },
-            {
-              name: "moodle_get_calendar_events",
-              fn: "core_calendar_get_action_events_by_timesort",
-            },
-            {
-              name: "moodle_list_quizzes",
-              fn: "mod_quiz_get_quizzes_by_courses",
-            },
-            {
-              name: "moodle_get_quiz_attempts",
-              fn: "mod_quiz_get_user_attempts",
-            },
-            {
-              name: "moodle_get_forum_discussions",
-              fn: "mod_forum_get_forum_discussions",
-            },
-            {
-              name: "moodle_get_notifications",
-              fn: "message_popup_get_popup_notifications",
-            },
-          ];
-
-          lines.push(``, `**Tool availability on this server:**`);
-          for (const { name, fn } of toolStatus) {
-            const available = client.supports(fn) ? "✅" : "❌";
-            lines.push(`- ${available} \`${name}\``);
-          }
-          lines.push(`- ✅ \`moodle_list_courses\` (always available)`);
-          lines.push(`- ✅ \`moodle_get_course\` (always available)`);
-          lines.push(`- ✅ \`moodle_list_resources\` (always available)`);
-          lines.push(`- ✅ \`moodle_list_forums\` (always available)`);
+        lines.push("", "**Tool availability for this Moodle token:**");
+        for (const name of Object.keys(TOOL_FUNCTIONS)) {
+          lines.push(
+            `- ${canRegister(client, name) ? "Available" : "Not advertised by token"}: ${name}`,
+          );
         }
+        lines.push(
+          "",
+          "The MCP catalog is stable; Moodle permissions are checked when each tool runs.",
+        );
 
         return { content: [{ type: "text" as const, text: lines.join("\n") }] };
       },

@@ -1,3 +1,7 @@
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { strict as assert } from "node:assert";
 import { randomBytes, createHash } from "node:crypto";
@@ -13,6 +17,7 @@ const browserMode = process.argv.includes("--browser");
 const REDIRECT = "https://client.example/callback";
 const PASSWORD = "workers test passphrase only";
 const storage = await mkdtemp(join(tmpdir(), "moodle-workerd-"));
+let upstreamMode = "ok";
 let calls = 0,
   mf;
 const bindings = {
@@ -38,6 +43,12 @@ async function start(override = {}) {
     outboundService: async (request) => {
       assert.equal(new URL(request.url).origin, "https://moodle.example");
       calls++;
+      if (upstreamMode === "invalid-token")
+        return Response.json({
+          exception: "moodle_exception",
+          errorcode: "invalidtoken",
+          message: "sensitive-token-in-upstream-error",
+        });
       const params = new URLSearchParams(await request.text());
       assert.equal(params.get("wstoken"), bindings.MOODLE_TOKEN);
       switch (params.get("wsfunction")) {
@@ -47,9 +58,10 @@ async function start(override = {}) {
             sitename: "Test Moodle",
             fullname: "Test Student",
             release: "4.5",
-            functions: [...new Set(Object.values(TOOL_FUNCTIONS).flat())].map(
-              (name) => ({ name, version: "1" }),
-            ),
+            functions: (upstreamMode === "no-capabilities"
+              ? []
+              : [...new Set(Object.values(TOOL_FUNCTIONS).flat())]
+            ).map((name) => ({ name, version: "1" })),
           });
         case "core_enrol_get_users_courses":
           return Response.json([
@@ -328,6 +340,122 @@ try {
       assert.equal(result.status, 200, result.text);
       assert.match(result.text, /Sample course/);
       assert.ok(!result.text.includes(bindings.MOODLE_TOKEN));
+    },
+  );
+  await check(
+    "authenticated discovery survives Moodle failure and recovers on retry",
+    async () => {
+      await mf.dispose();
+      upstreamMode = "invalid-token";
+      await start();
+      const before = calls;
+      for (const version of [
+        "2024-11-05",
+        "2025-03-26",
+        "2025-06-18",
+        "2025-11-25",
+      ]) {
+        const init = await rpc(granted.access_token, "initialize", {
+          protocolVersion: version,
+          capabilities: {},
+          clientInfo: { name: "compat-discovery", version: "1" },
+        });
+        assert.equal(init.status, 200, init.text);
+        assert.equal(init.json.result.protocolVersion, version);
+        assert.ok(init.json.result.capabilities.tools);
+      }
+      const listing = await rpc(granted.access_token, "tools/list", {});
+      assert.equal(listing.status, 200, listing.text);
+      assert.equal(listing.json.result.tools.length, 14);
+      for (const tool of listing.json.result.tools) {
+        assert.ok(
+          !Object.hasOwn(tool, "execution"),
+          "Do not emit unused task metadata to strict clients",
+        );
+        assert.equal(tool.inputSchema.type, "object");
+        assert.deepEqual(tool._meta.securitySchemes, [
+          { type: "oauth2", scopes: ["moodle:read"] },
+        ]);
+      }
+      assert.equal(calls, before, "Discovery must not fetch the Moodle API");
+      const failed = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_site_info",
+        arguments: {},
+      });
+      assert.equal(failed.status, 200, failed.text);
+      assert.equal(failed.json.result.isError, true);
+      assert.match(failed.text, /Invalid Moodle token/);
+      assert.ok(!failed.text.includes("sensitive-token-in-upstream-error"));
+      upstreamMode = "ok";
+      const recovered = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_list_courses",
+        arguments: {},
+      });
+      assert.equal(recovered.status, 200, recovered.text);
+      assert.match(recovered.text, /Sample course/);
+    },
+  );
+  await check(
+    "official Streamable HTTP client discovers tools across requests",
+    async () => {
+      const sdkClient = new Client({
+        name: "official-http-discovery",
+        version: "1",
+      });
+      const transport = new StreamableHTTPClientTransport(
+        new URL(ORIGIN + "/mcp"),
+        {
+          requestInit: {
+            headers: { Authorization: `Bearer ${granted.access_token}` },
+          },
+          fetch: (input, init) =>
+            mf.dispatchFetch(
+              input instanceof Request ? input.url : String(input),
+              init,
+            ),
+        },
+      );
+      try {
+        await sdkClient.connect(transport);
+        const listing = await sdkClient.listTools();
+        assert.equal(listing.tools.length, 14);
+        const result = await sdkClient.callTool({
+          name: "moodle_list_courses",
+          arguments: {},
+        });
+        assert.notEqual(result.isError, true);
+        assert.match(JSON.stringify(result), /Sample course/);
+      } finally {
+        await sdkClient.close();
+      }
+    },
+  );
+  await check(
+    "catalog does not disappear when Moodle token capabilities are restricted",
+    async () => {
+      await mf.dispose();
+      upstreamMode = "no-capabilities";
+      await start();
+      const listing = await rpc(granted.access_token, "tools/list", {});
+      assert.equal(listing.status, 200);
+      assert.equal(listing.json.result.tools.length, 14);
+      const denied = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_list_courses",
+        arguments: {},
+      });
+      assert.equal(denied.status, 200);
+      assert.equal(denied.json.result.isError, true);
+      assert.match(denied.text, /core_enrol_get_users_courses/);
+      const info = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_site_info",
+        arguments: {},
+      });
+      assert.equal(info.status, 200);
+      assert.notEqual(info.json.result.isError, true);
+      assert.match(info.text, /Not advertised by token/);
+      await mf.dispose();
+      upstreamMode = "ok";
+      await start();
     },
   );
   await check("OAuth persists across workerd process restart", async () => {

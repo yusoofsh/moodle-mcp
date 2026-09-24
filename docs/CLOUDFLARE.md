@@ -62,6 +62,23 @@ After configuration, health and discovery should return 200; the unauthenticated
 
 DCR, PKCE S256, expiry, refresh rotation/replay detection, and revocation retain the existing provider behavior. This migration does not add CIMD or Moodle writes. Actual Moodle calls and a real ChatGPT authorization remain deployment acceptance checks.
 
+## Tool discovery and upstream failures
+
+After OAuth, `initialize`, `notifications/initialized`, `tools/list`, `prompts/list`,
+and `resources/templates/list` do not require a Moodle network call. The remote
+catalog contains all 14 implemented read-only tools. Actual tool calls and resource
+reads still require the configured token's Moodle capabilities and permissions.
+
+If Moodle is unreachable or rejects the token, tool execution returns a bounded
+MCP error instead of failing the discovery handshake with HTTP 500. The next
+invocation retries a failed initial connection. `moodle_get_site_info` is the first
+diagnostic to run; metadata discovery alone is not proof that Moodle is accessible.
+Refresh or reconnect an existing MCP client to replace any cached tool list.
+Password, OAuth scopes, secrets, Durable Object identity and storage remain unchanged.
+
+See [discovery regression evidence](DISCOVERY-VALIDATION.md) for the comparison
+with `rahilp/second-brain-cloudflare` and the tested compatibility matrix.
+
 ## Persistence and upgrades
 
 OAuth records, signing keys and throttling counters live in one named object, `idFromName('owner')`. Keep the Worker name, class, binding, migration history and AUTH_SECRET stable. Existing Docker SQLite files and OAuth credentials are not automatically imported. A different public origin is a different OAuth resource; reconnect clients. Do not delete the old container data as part of migration.

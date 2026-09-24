@@ -1,7 +1,10 @@
 import { reauthorize } from "../tools/download.js";
 import { ResourceTemplate } from "@modelcontextprotocol/server";
 import type { McpServer } from "@modelcontextprotocol/server";
-import type { MoodleClient } from "../moodle-client.js";
+import {
+  resolveMoodleClient,
+  type MoodleClientSource,
+} from "../moodle-source.js";
 
 interface ModuleContent {
   type: string;
@@ -56,17 +59,26 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 export function registerResources(
   server: McpServer,
-  client: MoodleClient,
+  source: MoodleClientSource,
 ): void {
   if (
-    !client.supports("core_course_get_contents") ||
-    !client.supports("core_enrol_get_users_courses")
+    typeof source !== "function" &&
+    (!source.supports("core_course_get_contents") ||
+      !source.supports("core_enrol_get_users_courses"))
   )
     return;
   server.registerResource(
     "moodle-course-files",
     new ResourceTemplate("moodle://files/{fileId}", {
       list: async () => {
+        const client = await resolveMoodleClient(source);
+        if (
+          !client.supports("core_enrol_get_users_courses") ||
+          !client.supports("core_course_get_contents")
+        )
+          throw new Error(
+            "This Moodle token cannot list course file resources",
+          );
         const courses = await client.call<Course[]>(
           "core_enrol_get_users_courses",
           {
@@ -124,6 +136,9 @@ export function registerResources(
     }),
     {},
     async (uri, { fileId }) => {
+      const client = await resolveMoodleClient(source);
+      if (!client.supports("core_course_get_contents"))
+        throw new Error("This Moodle token cannot read course file resources");
       const ref = await client.fileIdStore.open(
         fileId as string,
         client.userId,
