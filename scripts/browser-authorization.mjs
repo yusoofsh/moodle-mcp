@@ -7,9 +7,17 @@ import { once } from "node:events";
 /** Native navigation/form submissions; never inject an Origin header. */
 export async function exerciseBrowserAuthorization(name, fixture) {
   const { origin, password, register, exchange, rpc } = fixture;
-  let callbackReferrer;
+  let callbackSeen = false;
+  let callbackHadReferrer = false;
   const callbackServer = createServer((req, res) => {
-    callbackReferrer = req.headers.referer;
+    // Browser favicon requests must not replace the navigation observation.
+    if (new URL(req.url, "http://127.0.0.1").pathname !== "/callback") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    callbackSeen = true;
+    callbackHadReferrer ||= req.headers.referer !== undefined;
     res.writeHead(200, {
       "Content-Type": "text/html",
       "Cache-Control": "no-store",
@@ -87,9 +95,10 @@ export async function exerciseBrowserAuthorization(name, fixture) {
     const callback = new URL(page.url());
     assert.equal(callback.searchParams.get("state"), state);
     assert.ok(callback.searchParams.get("code"));
+    assert.ok(callbackSeen, "The browser reached the callback listener");
     assert.equal(
-      callbackReferrer,
-      undefined,
+      callbackHadReferrer,
+      false,
       "Do not disclose referrers to the external callback",
     );
     const token = await exchange(
