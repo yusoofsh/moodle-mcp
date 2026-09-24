@@ -183,9 +183,18 @@ export function moodleConnectionRouter(
       res.status(401).json({ error: "Owner login required" });
       return;
     }
-    res.json({ csrf: owner.csrf, connection: connection.state() });
+    res.json({
+      csrf: owner.csrf,
+      connection: connection.state(),
+      returnVerified:
+        store.get("MoodleReturnVerified", owner.key)?.principal ===
+        config.ownerId,
+      pending: connection.pendingReturn(owner.key, config.ownerId),
+    });
   });
   const actions = [
+    "probe",
+    "probe-complete",
     "start",
     "complete",
     "confirm",
@@ -214,6 +223,43 @@ export function moodleConnectionRouter(
       }
       const action = req.path.slice(CONNECT_PATH.length + 1);
       try {
+        if (action === "probe") {
+          const nonce = random();
+          store.take("MoodleReturnVerified", owner.key);
+          store.put(
+            "MoodleReturnProbe",
+            owner.key,
+            { nonce, principal: config.ownerId },
+            600,
+          );
+          res.json({ probeUrl: "web+moodlemcp://probe=" + nonce });
+          return;
+        }
+        if (action === "probe-complete") {
+          const raw: unknown = req.body?.callback;
+          if (req.body) delete req.body.callback;
+          const probe = store.take("MoodleReturnProbe", owner.key);
+          if (
+            !probe ||
+            probe.principal !== config.ownerId ||
+            typeof probe.nonce !== "string" ||
+            !same(raw, "web+moodlemcp://probe=" + probe.nonce)
+          ) {
+            res.status(400).json({
+              error:
+                "Browser-return test expired or did not match this setup session. Enable browser return and test again.",
+            });
+            return;
+          }
+          store.put(
+            "MoodleReturnVerified",
+            owner.key,
+            { principal: config.ownerId },
+            600,
+          );
+          res.json({ ok: true });
+          return;
+        }
         if (action === "start") {
           const publicConfig = await connection.publicConfig();
           // Recheck after network I/O so an expired/logged-out session cannot start a transaction.
@@ -262,6 +308,8 @@ export function moodleConnectionRouter(
         if (action === "logout") {
           connection.cancel(owner.key);
           store.take("MoodleOwnerSession", owner.key);
+          store.take("MoodleReturnProbe", owner.key);
+          store.take("MoodleReturnVerified", owner.key);
           res.clearCookie(cookie, options);
         }
         res.json({ ok: true, connection: connection.state() });

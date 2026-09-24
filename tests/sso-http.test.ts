@@ -134,6 +134,8 @@ describe("owner-only Moodle onboarding routes", () => {
     const auth = await owner();
     for (const action of [
       "start",
+      "probe",
+      "probe-complete",
       "complete",
       "confirm",
       "cancel",
@@ -235,5 +237,83 @@ describe("owner-only Moodle onboarding routes", () => {
     expect(
       (await another.agent.get(path + "/status").set("Host", host)).status,
     ).toBe(401);
+  });
+});
+
+describe("browser return diagnostics", () => {
+  it("requires an actual matching one-use probe return before marking the handler verified", async () => {
+    const auth = await owner();
+    const getStatus = () => auth.agent.get(path + "/status").set("Host", host);
+    expect((await getStatus()).body.returnVerified).toBe(false);
+    const probe = await action(auth, "probe");
+    expect(probe.status, probe.text).toBe(200);
+    expect(probe.body.probeUrl).toMatch(
+      /^web\+moodlemcp:\/\/probe=[A-Za-z0-9_-]{43}$/,
+    );
+    expect((await getStatus()).body.returnVerified).toBe(false);
+    expect(
+      (await action(auth, "probe-complete", { callback: probe.body.probeUrl }))
+        .status,
+    ).toBe(200);
+    expect((await getStatus()).body.returnVerified).toBe(true);
+    expect(
+      (await action(auth, "probe-complete", { callback: probe.body.probeUrl }))
+        .status,
+    ).toBe(400);
+    expect(factory).not.toHaveBeenCalled();
+  });
+  it("binds probe returns to the setup browser without exposing Moodle credentials", async () => {
+    const first = await owner(),
+      second = await owner();
+    const probe = await action(first, "probe");
+    expect(
+      (
+        await action(second, "probe-complete", {
+          callback: probe.body.probeUrl,
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (await action(first, "probe-complete", { callback: probe.body.probeUrl }))
+        .status,
+    ).toBe(200);
+    expect(factory).not.toHaveBeenCalled();
+    expect(probe.text).not.toContain(token);
+  });
+  it("expires probe results and does not make a probe a Moodle token callback", async () => {
+    const auth = await owner();
+    const probe = await action(auth, "probe");
+    expect(
+      (await action(auth, "complete", { callback: probe.body.probeUrl }))
+        .status,
+    ).toBe(400);
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 601000);
+    expect(
+      (await action(auth, "probe-complete", { callback: probe.body.probeUrl }))
+        .status,
+    ).toBe(400);
+    expect(factory).not.toHaveBeenCalled();
+  });
+  it("returns a recovery link for the same pending attempt without forcing Google login again", async () => {
+    const auth = await owner();
+    const begin = await action(auth, "start");
+    const launch = new URL(begin.body.launchUrl);
+    const status = await auth.agent.get(path + "/status").set("Host", host);
+    const pending = status.body.pending;
+    expect(pending.expiresAt).toBeGreaterThan(Date.now());
+    const finish = new URL(pending.finishUrl);
+    expect(finish.origin).toBe(site);
+    expect(finish.pathname).toBe("/admin/tool/mobile/launch.php");
+    expect(finish.searchParams.get("passport")).toBe(
+      launch.searchParams.get("passport"),
+    );
+    expect(finish.searchParams.get("confirmed")).toBe("1");
+    expect(finish.searchParams.has("oauthsso")).toBe(false);
+    expect(factory).not.toHaveBeenCalled();
+    expect((await action(auth, "cancel")).status).toBe(200);
+    expect(
+      (await auth.agent.get(path + "/status").set("Host", host)).body.pending,
+    ).toBeNull();
   });
 });

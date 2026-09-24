@@ -118,11 +118,51 @@ export class MoodleConnection {
         principal,
         site: this.config.baseUrl,
         expected: mobileSiteId(this.config.baseUrl, passport),
+        launch,
+        expiresAt: Date.now() + 600000,
         revision: this.revision(),
       },
       600,
     );
     return launch;
+  }
+  /** Read-only recovery of this browser's live pairing, never a new passport. */
+  pendingReturn(
+    session: string,
+    principal: string,
+  ): {
+    launchUrl: string;
+    finishUrl: string;
+    expiresAt: number;
+  } | null {
+    const pairing = this.store.get("MoodlePair", session);
+    if (
+      !pairing ||
+      pairing.principal !== principal ||
+      pairing.site !== this.config.baseUrl ||
+      pairing.revision !== this.revision() ||
+      typeof pairing.launch !== "string" ||
+      typeof pairing.expiresAt !== "number" ||
+      pairing.expiresAt <= Date.now() ||
+      this.store.get("MoodlePairGeneration", session)?.generation !==
+        pairing.generation
+    )
+      return null;
+    const finish = new URL(pairing.launch);
+    if (
+      finish.origin !== new URL(this.config.baseUrl).origin ||
+      finish.pathname !==
+        new URL(this.config.baseUrl + "/admin/tool/mobile/launch.php").pathname
+    )
+      return null;
+    // Reuse the university browser session rather than looping through Google.
+    finish.searchParams.delete("oauthsso");
+    finish.searchParams.set("confirmed", "1");
+    return {
+      launchUrl: pairing.launch,
+      finishUrl: finish.href,
+      expiresAt: pairing.expiresAt,
+    };
   }
   cancel(session: string): void {
     this.store.take("MoodlePair", session);

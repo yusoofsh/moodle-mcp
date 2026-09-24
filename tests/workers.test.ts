@@ -126,3 +126,41 @@ describe("Workers portability and limits", () => {
     store.close();
   });
 });
+
+it("keeps setup mutation limits without counting harmless page and script loads as attempts", () => {
+  const db = new DatabaseSync(":memory:"),
+    store = new SqlAuthStore(db, secret);
+  try {
+    for (let i = 0; i < 40; i++)
+      expect(
+        reserveHttpRequest(
+          store,
+          secret,
+          "192.0.2.50",
+          "/connect/moodle/status",
+          "GET",
+        ),
+      ).toBe(0);
+    for (let i = 0; i < 30; i++)
+      expect(
+        reserveHttpRequest(
+          store,
+          secret,
+          "192.0.2.50",
+          "/connect/moodle/probe",
+          "POST",
+        ),
+      ).toBe(0);
+    expect(
+      reserveHttpRequest(
+        store,
+        secret,
+        "192.0.2.50",
+        "/connect/moodle/probe",
+        "POST",
+      ),
+    ).toBeGreaterThan(0);
+  } finally {
+    store.close();
+  }
+});

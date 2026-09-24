@@ -185,3 +185,40 @@ describe("connection operation race boundaries", () => {
     await expect(pending).rejects.toThrow(/changed/);
   });
 });
+
+describe("pending mobile return recovery", () => {
+  it("does not resume another principal or a cancelled, expired, or superseded connection", () => {
+    const launch = connection.begin("browser", "owner", publicConfig);
+    expect(connection.pendingReturn("other", "owner")).toBeNull();
+    expect(connection.pendingReturn("browser", "other")).toBeNull();
+    expect(connection.pendingReturn("browser", "owner")?.launchUrl).toBe(
+      launch,
+    );
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 601000);
+    expect(connection.pendingReturn("browser", "owner")).toBeNull();
+    vi.useRealTimers();
+    connection.begin("browser", "owner", publicConfig);
+    connection.disconnect();
+    expect(connection.pendingReturn("browser", "owner")).toBeNull();
+  });
+  it("leaves the passport valid for exactly one Moodle return after recovery", async () => {
+    const launch = new URL(connection.begin("browser", "owner", publicConfig));
+    const finish = new URL(
+      connection.pendingReturn("browser", "owner")!.finishUrl,
+    );
+    expect(finish.searchParams.get("passport")).toBe(
+      launch.searchParams.get("passport"),
+    );
+    const raw =
+      "web+moodlemcp://token=" +
+      Buffer.from(
+        mobileSiteId(site, finish.searchParams.get("passport")!) +
+          ":::" +
+          token,
+      ).toString("base64");
+    await connection.stage("browser", "owner", raw);
+    expect(connection.pendingReturn("browser", "owner")).toBeNull();
+    await expect(connection.stage("browser", "owner", raw)).rejects.toThrow();
+  });
+});

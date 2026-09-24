@@ -83,7 +83,7 @@ async function exercise(name) {
       "CF-Connecting-IP": name === "chromium" ? "192.0.2.90" : "192.0.2.91",
     },
   });
-  const page = await context.newPage();
+  let page = await context.newPage();
   page.setDefaultTimeout(15000);
   let postedCallback = false;
   try {
@@ -107,7 +107,23 @@ async function exercise(name) {
     await page
       .getByRole("button", { name: "1. Enable browser return", exact: true })
       .click();
+    await page.locator("#handler-test").waitFor({ state: "visible" });
+    assert.equal(
+      await page.locator("#connect").isDisabled(),
+      true,
+      "Registration alone must not unlock Google sign-in",
+    );
+    const probe = await page.locator("#handler-test").getAttribute("href");
+    assert.match(probe, /^web\+moodlemcp:\/\/probe=[A-Za-z0-9_-]{43}$/);
+    // Permission/native scheme dispatch remains manual. Supply only the test return
+    // a permitted handler would generate, then verify the real owner-bound POST.
+    await page.goto(origin + base + "/return#" + encodeURIComponent(probe));
     await page.locator("#connect:not([disabled])").waitFor();
+    assert.match(
+      await page.locator("#handler-status").innerText(),
+      /Browser return verified/,
+    );
+    assert.equal(page.url(), origin + base + "/return");
     const startResponse = page.waitForResponse(
       (r) => new URL(r.url()).pathname === base + "/start",
     );
@@ -121,6 +137,22 @@ async function exercise(name) {
     assert.equal(launch.origin, site);
     assert.equal(launch.searchParams.get("oauthsso"), "3");
     assert.equal(launch.searchParams.get("urlscheme"), "web+moodlemcp");
+    assert.equal(launch.searchParams.get("confirmed"), "1");
+    await page.locator("#finish").waitFor({ state: "visible" });
+    const finish = new URL(await page.locator("#finish").getAttribute("href"));
+    assert.equal(
+      finish.searchParams.get("passport"),
+      launch.searchParams.get("passport"),
+    );
+    assert.equal(finish.searchParams.has("oauthsso"), false);
+    assert.equal(finish.searchParams.get("confirmed"), "1");
+    // Pending link survives reloading the setup page without creating a new login.
+    await page.reload();
+    await page.locator("#finish").waitFor({ state: "visible" });
+    assert.equal(
+      await page.locator("#finish").getAttribute("href"),
+      finish.href,
+    );
     const id = createHash("md5")
       .update(site + launch.searchParams.get("passport"))
       .digest("hex");
@@ -130,18 +162,34 @@ async function exercise(name) {
         id + ":::" + token + ":::discard-this-private-token",
       ).toString("base64");
     const requests = [];
-    page.on("request", (r) => {
+    context.on("request", (r) => {
       requests.push(r.url());
       if (new URL(r.url()).pathname === base + "/complete")
         postedCallback = true;
     });
-    await page.route(site + "/**", (route) =>
+    await context.route(site + "/**", (route) =>
       route.fulfill({
         contentType: "text/html",
         body: `<h1>University SSO test fixture</h1><a href="${origin + base + "/return#" + encodeURIComponent(raw)}">Return from Moodle fixture</a>`,
       }),
     );
-    await page.goto(launch.href);
+    const setup = page;
+    const [university] = await Promise.all([
+      context.waitForEvent("page"),
+      setup.locator("#launch").click(),
+    ]);
+    await university.waitForLoadState("domcontentloaded");
+    assert.equal(university.url(), launch.href);
+    assert.equal(new URL(setup.url()).origin, origin, "Setup tab stays open");
+    await university.close();
+    const [recovery] = await Promise.all([
+      context.waitForEvent("page"),
+      setup.locator("#finish").click(),
+    ]);
+    page = recovery;
+    page.setDefaultTimeout(15000);
+    await page.waitForLoadState("domcontentloaded");
+    assert.equal(page.url(), finish.href);
     await page
       .getByRole("link", { name: "Return from Moodle fixture", exact: true })
       .click();
@@ -222,7 +270,7 @@ async function exercise(name) {
     console.log(
       "PASS " +
         name +
-        ": native owner login, protocol API, synthetic fragment return, confirmation, durable restart, token selection, logout",
+        ": owner login, unverified-return guard, simulated probe, new-tab sign-in, same-attempt recovery, confirmation, durable restart, token selection, logout",
     );
   } finally {
     await browser.close();

@@ -8,6 +8,7 @@ export function reserveHttpRequest(
   secret: string,
   address: string,
   path: string,
+  method = "POST",
 ): number {
   const now = Math.floor(Date.now() / 1000);
   const ip = createHmac("sha256", Buffer.from(secret, "hex"))
@@ -22,7 +23,10 @@ export function reserveHttpRequest(
       { key: "registration", window: 3600, limit: 50 },
       { key: `registration:${ip}`, window: 3600, limit: 20 },
     );
-  if (path.startsWith("/interaction") || path.startsWith("/connect/moodle"))
+  if (
+    path.startsWith("/interaction") ||
+    (path.startsWith("/connect/moodle") && !["GET", "HEAD"].includes(method))
+  )
     budgets.push({ key: `interaction:${ip}`, window: 60, limit: 30 });
   const counters = budgets.map((b) => {
     const old = store.get("HttpBudget", b.key);

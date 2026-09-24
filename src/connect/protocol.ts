@@ -41,6 +41,8 @@ export function buildMobileLaunch(
     service: "moodle_mobile_app",
     passport,
     urlscheme: SSO_SCHEME,
+    // Ask Moodle for a visible launch link; automatic scheme redirects can stall.
+    confirmed: "1",
   }).toString();
   const provider = config.identityproviders?.find((p) =>
     /google/i.test(p.name),

@@ -33,6 +33,7 @@ describe("Moodle mobile SSO protocol", () => {
     expect(launch.searchParams.get("oauthsso")).toBe("3");
     expect(launch.searchParams.get("urlscheme")).toBe("web+moodlemcp");
     expect(launch.searchParams.get("service")).toBe("moodle_mobile_app");
+    expect(launch.searchParams.get("confirmed")).toBe("1");
     expect(launch.searchParams.has("sesskey")).toBe(false);
   });
   it("returns only the API token and discards the optional private token", () => {

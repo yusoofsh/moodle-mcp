@@ -26,6 +26,8 @@ const paths = new Set([
     "/client.js",
     "/return",
     "/status",
+    "/probe",
+    "/probe-complete",
     "/start",
     "/complete",
     "/confirm",
@@ -97,6 +99,7 @@ export class MoodleMcp extends DurableObject<WorkerEnv> {
         this.env.AUTH_SECRET!,
         request.headers.get("X-Forwarded-For") ?? "unknown",
         path,
+        request.method,
       );
       if (retry) return fail(429, "Request budget exceeded", retry);
       // Request-driven cleanup permits idle lifecycle management.
