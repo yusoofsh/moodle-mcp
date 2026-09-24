@@ -137,6 +137,7 @@ describe("owner-only Moodle onboarding routes", () => {
       "probe",
       "probe-complete",
       "complete",
+      "import",
       "confirm",
       "cancel",
       "disconnect",
@@ -315,5 +316,164 @@ describe("browser return diagnostics", () => {
     expect(
       (await auth.agent.get(path + "/status").set("Host", host)).body.pending,
     ).toBeNull();
+  });
+});
+
+describe("explicit copied-link import authorization", () => {
+  const copied = () =>
+    "moodlemobile://token=" +
+    Buffer.from(
+      "a".repeat(32) + ":::" + token + ":::discard-private-credential",
+    ).toString("base64");
+  it("rejects imports without the authenticated owner browser, even with a valid MCP access token", async () => {
+    const reg = await request(runtime.app)
+      .post("/oauth/register")
+      .set("Host", host)
+      .send({
+        redirect_uris: ["https://client.example/callback"],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+      });
+    const config = getHttpConfig({
+      PUBLIC_URL: origin,
+      ALLOW_INSECURE_HTTP: "true",
+      AUTH_SECRET: secret,
+      AUTH_PASSWORD_HASH: hash,
+    });
+    const grant = new runtime.provider.Grant({
+      accountId: config.ownerId,
+      clientId: reg.body.client_id,
+    });
+    grant.addResourceScope(origin + "/mcp", "moodle:read");
+    const grantId = await grant.save();
+    const access = new runtime.provider.AccessToken({
+      accountId: config.ownerId,
+      clientId: reg.body.client_id,
+      grantId,
+      scope: "moodle:read",
+      aud: origin + "/mcp",
+    });
+    const credential = await access.save();
+    const res = await request(runtime.app)
+      .post(path + "/import")
+      .set("Host", host)
+      .set("Origin", origin)
+      .set("Authorization", "Bearer " + credential)
+      .send({ callback: copied(), password, acknowledge: true });
+    expect(res.status).toBe(401);
+    expect(factory).not.toHaveBeenCalled();
+  });
+  it("requires exact Origin, session CSRF, explicit acknowledgement and the fresh owner password", async () => {
+    const auth = await owner();
+    for (const foreign of ["null", "https://evil.example"]) {
+      const res = await auth.agent
+        .post(path + "/import")
+        .set("Host", host)
+        .set("Origin", foreign)
+        .set("X-CSRF-Token", auth.csrf)
+        .send({ callback: copied(), password, acknowledge: true });
+      expect(res.status).toBe(403);
+    }
+    expect(
+      (
+        await auth.agent
+          .post(path + "/import")
+          .set("Host", host)
+          .set("Origin", origin)
+          .send({ callback: copied(), password, acknowledge: true })
+      ).status,
+    ).toBe(403);
+    expect(
+      (await action(auth, "import", { callback: copied(), password })).status,
+    ).toBe(400);
+    expect(
+      (
+        await action(auth, "import", {
+          callback: copied(),
+          password: "incorrect",
+          acknowledge: true,
+        })
+      ).status,
+    ).toBe(401);
+    expect(factory).not.toHaveBeenCalled();
+    const staged = await action(auth, "import", {
+      callback: copied(),
+      password,
+      acknowledge: true,
+    });
+    expect(staged.status, staged.text).toBe(200);
+    expect(staged.body.userId).toBe(42);
+    expect(staged.body.credentialSource).toBe("copied-link");
+    expect(runtime.connection!.state().status).toBe("disconnected");
+    expect(staged.text).not.toContain(token);
+    expect(staged.text).not.toContain(password);
+    expect(
+      (
+        await action(auth, "confirm", {
+          confirmation: staged.body.confirmation,
+        })
+      ).status,
+    ).toBe(200);
+    expect(runtime.connection!.state().credentialSource).toBe("copied-link");
+    expect(runtime.connection!.state().status).toBe("connected");
+  });
+  it("does not turn an expired/unknown automatic callback into a manual credential import", async () => {
+    const auth = await owner();
+    const res = await action(auth, "complete", {
+      callback: copied().replace("moodlemobile:", "web+moodlemcp:"),
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("pairing_missing");
+    expect(factory).not.toHaveBeenCalled();
+    expect(res.text).not.toContain(token);
+    const valid = await action(auth, "import", {
+      callback: copied(),
+      password,
+      acknowledge: true,
+    });
+    expect(valid.status).toBe(200);
+  });
+  it("rejects wrapper URLs and never reflects copied credentials or upstream exceptions", async () => {
+    const auth = await owner();
+    const res = await action(auth, "import", {
+      callback: origin + path + "/return#" + encodeURIComponent(copied()),
+      password,
+      acknowledge: true,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("invalid_return");
+    expect(factory).not.toHaveBeenCalled();
+    factory.mockRejectedValueOnce(new Error("private:" + token));
+    const failed = await action(auth, "import", {
+      callback: copied(),
+      password,
+      acknowledge: true,
+    });
+    expect(failed.status).toBe(400);
+    expect(failed.text).not.toContain(token);
+    expect(failed.text).not.toContain(copied());
+    expect(runtime.connection!.state().status).toBe("disconnected");
+  });
+  it("shares the persistent password-attempt budget with normal owner login", async () => {
+    const auth = await owner();
+    for (let i = 0; i < 4; i++)
+      expect(
+        (
+          await action(auth, "import", {
+            callback: copied(),
+            password: "wrong",
+            acknowledge: true,
+          })
+        ).status,
+      ).toBe(401);
+    const limited = await action(auth, "import", {
+      callback: copied(),
+      password,
+      acknowledge: true,
+    });
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers["retry-after"])).toBeGreaterThan(0);
+    expect(factory).not.toHaveBeenCalled();
   });
 });

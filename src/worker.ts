@@ -30,6 +30,7 @@ const paths = new Set([
     "/probe-complete",
     "/start",
     "/complete",
+    "/import",
     "/confirm",
     "/cancel",
     "/disconnect",

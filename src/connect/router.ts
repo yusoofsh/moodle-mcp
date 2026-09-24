@@ -7,6 +7,7 @@ import type { SqlAuthStore } from "../auth/sql-store.js";
 import { acquirePasswordSlot } from "../auth/password-slot.js";
 import { verifyPassword } from "../auth/password.js";
 import { reservePasswordAttempt } from "../auth/password-throttle.js";
+import { MobileReturnError } from "./protocol.js";
 import type { MoodleConnection } from "./connection.js";
 import { CONNECT_PATH, connectionPage, connectionScript } from "./ui.js";
 const random = () => Buffer.from(randomBytes(32)).toString("base64url");
@@ -197,6 +198,7 @@ export function moodleConnectionRouter(
     "probe-complete",
     "start",
     "complete",
+    "import",
     "confirm",
     "cancel",
     "disconnect",
@@ -208,6 +210,13 @@ export function moodleConnectionRouter(
     actions.map((a) => CONNECT_PATH + "/" + a),
     json({ limit: "8kb" }),
     async (req, res) => {
+      // Clear all submitted credentials before any downstream error processing.
+      const callback: unknown = req.body?.callback;
+      const importPassword: unknown = req.body?.password;
+      if (req.body && typeof req.body === "object") {
+        delete req.body.callback;
+        delete req.body.password;
+      }
       const owner = session(req);
       if (!owner) {
         res.status(401).json({ error: "Owner login required; restart setup" });
@@ -236,8 +245,7 @@ export function moodleConnectionRouter(
           return;
         }
         if (action === "probe-complete") {
-          const raw: unknown = req.body?.callback;
-          if (req.body) delete req.body.callback;
+          const raw = callback;
           const probe = store.take("MoodleReturnProbe", owner.key);
           if (
             !probe ||
@@ -277,9 +285,69 @@ export function moodleConnectionRouter(
           });
           return;
         }
+        if (action === "import") {
+          if (
+            config.authMode !== "password" ||
+            req.body?.acknowledge !== true
+          ) {
+            res.status(400).json({
+              error:
+                "Confirm that this is your own Moodle credential, then enter the bridge-owner passphrase.",
+            });
+            return;
+          }
+          const releasePassword = acquirePasswordSlot(store);
+          if (!releasePassword) {
+            res
+              .status(429)
+              .set("Retry-After", "1")
+              .json({ error: "Password verification is busy; retry shortly." });
+            return;
+          }
+          try {
+            const retry = reservePasswordAttempt(
+              store,
+              config.authSecret,
+              req.ip || "unknown",
+            );
+            if (retry) {
+              res.status(429).set("Retry-After", String(retry)).json({
+                error: "Too many password attempts; try again later.",
+              });
+              return;
+            }
+            if (!(await verifyPassword(importPassword, config.passwordHash))) {
+              res.status(401).json({
+                error:
+                  "Incorrect bridge-owner passphrase. The Moodle connection was not changed.",
+              });
+              return;
+            }
+          } finally {
+            releasePassword();
+          }
+          if (!session(req)) {
+            res
+              .status(401)
+              .json({ error: "Setup session expired; sign in again." });
+            return;
+          }
+          const candidate = await connection.stageCopiedLink(
+            owner.key,
+            config.ownerId,
+            callback,
+          );
+          if (!session(req)) {
+            connection.cancel(owner.key);
+            res
+              .status(401)
+              .json({ error: "Setup session expired; sign in again." });
+            return;
+          }
+          res.json(candidate);
+          return;
+        }
         if (action === "complete") {
-          const callback: unknown = req.body?.callback;
-          if (req.body) delete req.body.callback;
           const candidate = await connection.stage(
             owner.key,
             config.ownerId,
@@ -313,15 +381,24 @@ export function moodleConnectionRouter(
           res.clearCookie(cookie, options);
         }
         res.json({ ok: true, connection: connection.state() });
-      } catch {
+      } catch (error) {
+        if (
+          error instanceof MobileReturnError &&
+          (action === "complete" || action === "import")
+        ) {
+          res.status(400).json({ error: error.message, code: error.code });
+          return;
+        }
         // Never echo OAuth payloads, upstream responses, URLs, tokens, or stacks.
         res.status(400).json({
           error:
-            action === "complete"
-              ? "Moodle return could not be validated. The session may have expired, the account may differ, or the institution may restrict the handoff. Restart setup."
-              : action === "check"
-                ? "Moodle did not accept the connection. Reconnect with university SSO or check the configured token."
-                : "Connection request could not be completed. Restart setup; existing credentials were not replaced unless explicitly confirmed.",
+            action === "import"
+              ? "Copied link could not be validated for this university account. Check that the credential is current and belongs to the pinned account. Existing credentials were not replaced."
+              : action === "complete"
+                ? "Moodle return could not be validated. The session may have expired, the account may differ, or the institution may restrict the handoff. Restart setup."
+                : action === "check"
+                  ? "Moodle did not accept the connection. Reconnect with university SSO or check the configured token."
+                  : "Connection request could not be completed. Restart setup; existing credentials were not replaced unless explicitly confirmed.",
         });
       }
     },

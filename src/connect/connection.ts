@@ -8,6 +8,8 @@ import {
   buildMobileLaunch,
   mobileSiteId,
   parseMobileReturn,
+  parseCopiedMobileLink,
+  MobileReturnError,
   type MobilePublicConfig,
 } from "./protocol.js";
 
@@ -23,6 +25,7 @@ interface ConnectionRecord {
   fullname?: string;
   siteName?: string;
   verifiedAt?: number;
+  credentialSource?: "sso" | "copied-link";
 }
 export class MoodleConnection {
   private cached?: { revision: string; pending: Promise<MoodleClient> };
@@ -59,6 +62,8 @@ export class MoodleConnection {
       fullname: r?.fullname,
       siteName: r?.siteName,
       verifiedAt: r?.verifiedAt,
+      credentialSource:
+        r?.mode === "sso" ? (r.credentialSource ?? "sso") : undefined,
       hasFallback: Boolean(
         this.config.token || (this.config.username && this.config.password),
       ),
@@ -176,10 +181,44 @@ export class MoodleConnection {
       pairing.principal !== principal ||
       pairing.site !== this.config.baseUrl
     )
-      throw new Error(
-        "Pairing expired or belongs to another browser; restart connection",
-      );
+      throw new MobileReturnError("pairing_missing");
     const token = parseMobileReturn(raw, String(pairing.expected));
+    return this.validateCandidate(session, principal, token, {
+      generation: String(pairing.generation),
+      revision: String(pairing.revision),
+      source: "sso",
+    });
+  }
+  /** Called ONLY by the explicit owner/password-protected import endpoint.
+   * Never use this as a fallback for a failed automatic return.
+   */
+  async stageCopiedLink(session: string, principal: string, raw: unknown) {
+    const token = parseCopiedMobileLink(raw);
+    const generation = random(),
+      revision = this.revision();
+    this.cancel(session);
+    this.store.put(
+      "MoodlePairGeneration",
+      session,
+      { generation, principal },
+      300,
+    );
+    return this.validateCandidate(session, principal, token, {
+      generation,
+      revision,
+      source: "copied-link",
+    });
+  }
+  private async validateCandidate(
+    session: string,
+    principal: string,
+    token: string,
+    pairing: {
+      generation: string;
+      revision: string;
+      source: "sso" | "copied-link";
+    },
+  ) {
     let client: MoodleClient;
     try {
       client = await this.factory({
@@ -220,11 +259,12 @@ export class MoodleConnection {
         revision: pairing.revision,
         confirmation,
         token,
+        credentialSource: pairing.source,
         ...info,
       },
       300,
     );
-    return { confirmation, ...info };
+    return { confirmation, credentialSource: pairing.source, ...info };
   }
   confirm(session: string, principal: string, confirmation: unknown): void {
     const c = this.store.take("MoodleCandidate", session);
@@ -256,6 +296,8 @@ export class MoodleConnection {
       fullname: c.fullname,
       siteName: c.siteName,
       verifiedAt: Date.now(),
+      credentialSource:
+        c.credentialSource === "copied-link" ? "copied-link" : "sso",
     });
     this.cached = undefined;
     this.failed = false;

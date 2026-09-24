@@ -54,3 +54,12 @@ returns use URL fragments cleared before a CSRF-protected POST; query-token retu
 are rejected. The optional mobile private token is discarded. Disconnect never
 revokes the official mobile app token. See [SSO onboarding](docs/SSO-ONBOARDING.md)
 for the callback threat model, credential precedence and acceptance-test limits.
+
+### Explicit copied-link provisioning
+
+The optional `/connect/moodle/import` action is owner-only credential provisioning,
+not an OAuth callback. It requires the authenticated setup browser, a fresh owner
+password, exact Origin, JSON, CSRF and explicit acknowledgement, then validates
+only on the configured Moodle host and requires account confirmation. The pinned
+account and encrypted candidate/race controls remain enforced. It is never invoked
+automatically after an invalid/expired SSO return. See `docs/COPIED-LINK-IMPORT.md`.

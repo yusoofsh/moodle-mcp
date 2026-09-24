@@ -61,33 +61,64 @@ export function buildMobileLaunch(
   }
   return url.href;
 }
-/** Accept only a return generated for this pending transaction. Never parse its base64 authority through URL, which may normalize it. */
-export function parseMobileReturn(
+/** Fixed messages only; never include callback payloads in public errors. */
+export class MobileReturnError extends Error {
+  constructor(
+    readonly code: "invalid_return" | "pairing_mismatch" | "pairing_missing",
+  ) {
+    const messages = {
+      invalid_return:
+        "Invalid Moodle return format. For a copied app link, use Import copied Moodle link on the setup page.",
+      pairing_mismatch:
+        "Moodle return belongs to a different connection attempt. Restart SSO, or explicitly import your own copied Moodle link.",
+      pairing_missing:
+        "Pairing expired, was already used, or belongs to another browser. Restart SSO, or explicitly import your own copied Moodle link.",
+    };
+    super(messages[code]);
+  }
+}
+function decodeMobileLink(
   raw: unknown,
-  expectedSiteId: string,
-): string {
+  copied: boolean,
+): { siteId: string; token: string } {
   if (typeof raw !== "string" || raw.length > 2048)
-    throw new Error("Invalid Moodle return");
-  const match = /^web\+moodlemcp:\/\/token=([A-Za-z0-9+/]+={0,2})$/.exec(raw);
+    throw new MobileReturnError("invalid_return");
+  const pattern = copied
+    ? /^(?:moodlemobile|web\+moodlemcp):\/\/token=([A-Za-z0-9+/]+={0,2})$/
+    : /^web\+moodlemcp:\/\/token=([A-Za-z0-9+/]+={0,2})$/;
+  const match = pattern.exec(copied ? raw.trim() : raw);
   if (!match || match[1].length % 4 !== 0)
-    throw new Error("Invalid Moodle return");
+    throw new MobileReturnError("invalid_return");
   const decoded = Buffer.from(match[1], "base64");
   if (decoded.toString("base64") !== match[1])
-    throw new Error("Invalid Moodle return");
+    throw new MobileReturnError("invalid_return");
   const parts = decoded.toString("utf8").split(":::");
   if (
     (parts.length !== 2 && parts.length !== 3) ||
     !/^[a-f0-9]{32}$/.test(parts[0]) ||
     !/^[a-f0-9]{32}$/i.test(parts[1])
   )
-    throw new Error("Invalid Moodle return");
+    throw new MobileReturnError("invalid_return");
+  // Never retain or return the optional, more powerful mobile private token.
+  return { siteId: parts[0], token: parts[1] };
+}
+/** Automatic return: original scheme, live browser pairing and correlation remain mandatory. */
+export function parseMobileReturn(
+  raw: unknown,
+  expectedSiteId: string,
+): string {
+  const data = decodeMobileLink(raw, false);
   if (
     !/^[a-f0-9]{32}$/.test(expectedSiteId) ||
-    !timingSafeEqual(Buffer.from(parts[0]), Buffer.from(expectedSiteId))
+    !timingSafeEqual(Buffer.from(data.siteId), Buffer.from(expectedSiteId))
   )
-    throw new Error(
-      "Moodle return does not match this browser connection attempt",
-    );
-  // The optional third field is a different, more powerful mobile credential. Discard it.
-  return parts[1];
+    throw new MobileReturnError("pairing_mismatch");
+  return data.token;
+}
+/** Explicit credential provisioning, not an OAuth callback. The caller MUST require
+ * owner authentication, fresh password, CSRF and subsequent account confirmation.
+ * The payload's site identifier cannot establish ownership or the target site.
+ */
+export function parseCopiedMobileLink(raw: unknown): string {
+  return decodeMobileLink(raw, true).token;
 }

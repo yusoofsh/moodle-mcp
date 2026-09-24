@@ -169,3 +169,13 @@ this patch as verified end-to-end university SSO based only on these tests.
 No existing token, password, OAuth grant, binding name, class migration, university
 setting or account billing is modified by this code change. Fresh pairings receive
 a recoverable launch URL; older incomplete pairings should be restarted.
+
+### 0.6.2: importing an owner-copied app link
+
+When your own permitted Moodle login returns `moodlemobile://token=…`, the setup
+page now has **Import copied Moodle link**. This is a separate, explicit import:
+it requires your owner session, fresh bridge passphrase, authorization checkbox,
+server-side university token validation and final account confirmation. It does
+not require an old pairing or browser handler, and it does not relax `/complete`.
+See [copied-link import](COPIED-LINK-IMPORT.md) for steps and the security boundary.
+Do not change the scheme or put a credential in an HTTPS return URL manually.

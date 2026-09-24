@@ -175,3 +175,5 @@ the returned Moodle account. No new Google OAuth app is required.
 `MOODLE_TOKEN` remains an optional fallback; a confirmed SSO credential is stored
 encrypted. See [setup, security boundaries, and browser limitations](docs/SSO-ONBOARDING.md).
 The institution’s final custom-scheme handoff requires a live user acceptance test.
+
+For an app link that did not return automatically, use **Import copied Moodle link** on the owner setup page. See [the owner-approved import guide](docs/COPIED-LINK-IMPORT.md). No Google password or manual Cloudflare secret edit is needed.
