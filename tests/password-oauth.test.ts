@@ -197,6 +197,67 @@ async function exchange(clientId: string, code: string, verifier: string) {
     });
 }
 describe("Password login with OAuth protected MCP", () => {
+  it("uses a browser form referrer policy compatible with strict Origin checks", async () => {
+    const id = await register();
+    const flow = await begin(id);
+    const login = await flow.agent.get("/interaction").set("Host", host);
+    expect(login.headers["referrer-policy"]).toBe("same-origin");
+    expect(login.headers["content-security-policy"]).toContain(
+      "form-action 'self'",
+    );
+    const invalid = await flow.agent
+      .post("/interaction/password")
+      .set("Host", host)
+      .set("Origin", origin)
+      .type("form")
+      .send({ csrf: flow.state, password: "not the password" });
+    expect(invalid.status).toBe(401);
+    expect(invalid.headers["referrer-policy"]).toBe("same-origin");
+    const allowed = await consent(id);
+    const confirmation = await allowed.agent
+      .get("/interaction")
+      .set("Host", host);
+    expect(confirmation.headers["referrer-policy"]).toBe("same-origin");
+    expect(confirmation.headers["content-security-policy"]).toContain(
+      "form-action 'self' https://chatgpt.com;",
+    );
+    expect(login.headers["content-security-policy"]).toContain(
+      "form-action 'self';",
+    );
+    const discovery = await request(runtime.app)
+      .get("/.well-known/oauth-authorization-server")
+      .set("Host", host);
+    expect(discovery.headers["referrer-policy"]).toBe("no-referrer");
+  });
+  it.each([undefined, "null", "https://evil.example"])(
+    "rejects login and consent from untrusted Origin %s",
+    async (untrusted) => {
+      const id = await register();
+      const flow = await begin(id);
+      let submission = flow.agent
+        .post("/interaction/password")
+        .set("Host", host)
+        .type("form");
+      if (untrusted !== undefined)
+        submission = submission.set("Origin", untrusted);
+      const result = await submission.send({ csrf: flow.state, password });
+      expect(result.status).toBe(403);
+      expect(result.text).toBe("Invalid login request");
+      const consentFlow = await consent(id);
+      let approval = consentFlow.agent
+        .post("/interaction/confirm")
+        .set("Host", host)
+        .type("form");
+      if (untrusted !== undefined) approval = approval.set("Origin", untrusted);
+      const denied = await approval.send({
+        csrf: consentFlow.csrf,
+        decision: "allow",
+      });
+      expect(denied.status).toBe(403);
+      expect(denied.text).toBe("Invalid consent request");
+    },
+  );
+
   it("publishes RFC 9728 metadata and OAuth discovery with PKCE S256", async () => {
     const resource = await request(runtime.app)
       .get("/.well-known/oauth-protected-resource/mcp")

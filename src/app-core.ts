@@ -31,6 +31,10 @@ export function createAppWithStore(
   app.disable("x-powered-by");
   app.set("trust proxy", config.trustProxyHops);
   app.use(helmet());
+  // no-referrer makes native form POSTs send Origin: null. Preserve same-origin
+  // browser provenance on interaction pages without leaking referrers off-site.
+  // Keep the strict Origin checks and the default no-referrer on OAuth endpoints.
+  app.use("/interaction", helmet.referrerPolicy({ policy: "same-origin" }));
   app.get("/healthz", (_req, res) => res.json({ status: "ok" }));
   app.use((req, res, next) => {
     if (req.get("host") !== new URL(config.publicUrl).host) {

@@ -28,7 +28,9 @@ jobs:
       - run: bun run test
       - run: bun run build
       - run: bun run workers:build
-      - run: bun run workers:test
+      - name: Install browser regression runtimes
+        run: bunx --no-install playwright install --with-deps chromium firefox
+      - run: bun run workers:test:browser
       - run: bun audit
       - name: Build and smoke-test the container
         shell: bash

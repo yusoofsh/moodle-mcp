@@ -7,6 +7,8 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type Provider from "oidc-provider";
+import helmet from "helmet";
+import { consentCallbackOrigin } from "./consent-policy.js";
 import type { HttpConfig } from "./config.js";
 import type { SqlAuthStore as AuthStore } from "./sql-store.js";
 import { verifyPassword } from "./password.js";
@@ -95,6 +97,24 @@ export function interactionRouter(
       return;
     }
     const client = await provider.Client.find(String(details.params.client_id));
+    let callbackOrigin: string;
+    try {
+      callbackOrigin = consentCallbackOrigin(
+        details.params.redirect_uri,
+        client?.redirectUris,
+      );
+    } catch {
+      res
+        .status(400)
+        .send("Unsupported authorization callback; restart sign-in");
+      return;
+    }
+    // Browsers also apply form-action to the redirect chain after consent.
+    // The password page remains self-only; only this consent page permits the
+    // verified client callback. All other Helmet CSP directives remain enabled.
+    helmet.contentSecurityPolicy({
+      directives: { formAction: ["'self'", callbackOrigin] },
+    })(req, res, () => {});
     res.setHeader("Cache-Control", "no-store");
     res
       .type("html")

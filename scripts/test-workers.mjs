@@ -9,6 +9,7 @@ import { hashPassword } from "../dist/auth/password.js";
 import { TOOL_FUNCTIONS } from "../dist/tool-policy.js";
 
 const ORIGIN = "http://localhost:3000";
+const browserMode = process.argv.includes("--browser");
 const REDIRECT = "https://client.example/callback";
 const PASSWORD = "workers test passphrase only";
 const storage = await mkdtemp(join(tmpdir(), "moodle-workerd-"));
@@ -26,6 +27,7 @@ const bindings = {
 async function start(override = {}) {
   const options = convertV4MiniflareOptions({
     name: "moodle-mcp",
+    ...(browserMode ? { port: 3000 } : {}),
     modules: true,
     stripCfConnectingIp: false,
     scriptPath: ".wrangler/build/worker.js",
@@ -124,12 +126,12 @@ class Browser {
   }
 }
 const client = new Browser();
-async function register() {
+async function register(redirect = REDIRECT) {
   const r = await client.request("/oauth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      redirect_uris: [REDIRECT],
+      redirect_uris: [redirect],
       response_types: ["code"],
       grant_types: ["authorization_code", "refresh_token"],
       token_endpoint_auth_method: "none",
@@ -274,6 +276,24 @@ try {
     },
   );
   const id = await register();
+  if (browserMode) {
+    const { exerciseBrowserAuthorization } =
+      await import("./browser-authorization.mjs");
+    for (const name of ["chromium", "firefox"]) {
+      await check(
+        `${name}: native password, consent, PKCE and Moodle call`,
+        async () => {
+          await exerciseBrowserAuthorization(name, {
+            origin: ORIGIN,
+            password: PASSWORD,
+            register,
+            exchange,
+            rpc,
+          });
+        },
+      );
+    }
+  }
   let granted;
   await check("password, consent, PKCE exchange, code replay", async () => {
     const flow = await authorize(id, "192.0.2.2");
