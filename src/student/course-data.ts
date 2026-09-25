@@ -34,7 +34,8 @@ export const completionSchema = z.object({
 export const resourceContentSchema = z.object({
   type: z.string(),
   filename: z.string().optional(),
-  filepath: z.string().optional(),
+  // Moodle URL module exports explicitly set filepath to null.
+  filepath: z.string().nullish(),
   fileurl: z.string().nullish(),
   filesize: z.number().int().nonnegative().optional(),
   mimetype: z.string().nullish(),

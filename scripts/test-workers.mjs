@@ -192,6 +192,17 @@ async function start(override = {}) {
                   name: "Tutor 1",
                   modname: "url",
                   uservisible: true,
+                  contents: [
+                    {
+                      type: "url",
+                      filename: "Tutor 1",
+                      filepath: null,
+                      filesize: 0,
+                      fileurl:
+                        "https://www.youtube.com/watch?v=example1234&t=42",
+                      sortorder: null,
+                    },
+                  ],
                 },
                 {
                   id: 202,

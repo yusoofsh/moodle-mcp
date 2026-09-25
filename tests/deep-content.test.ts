@@ -709,3 +709,37 @@ it("treats encoded script links as data, never as navigable media", () => {
   expect(r.links).toEqual([]);
   expect(r.text).toBe("Unsafe link");
 });
+
+describe("Moodle URL exports have a nullable filepath", () => {
+  beforeEach(() => {
+    sections[0].modules.push({
+      id: 108,
+      instance: 208,
+      name: "Recording",
+      modname: "url",
+      uservisible: true,
+      contents: [
+        {
+          type: "url",
+          filename: "Recording",
+          filepath: null,
+          filesize: 0,
+          fileurl: "https://example.org/recording",
+          sortorder: null,
+        },
+      ],
+    });
+  });
+  it("does not reject the full course while listing forums", async () => {
+    const r = await readForums(client, 7);
+    expect(r.data.items[0].forumId).toBe(205);
+  });
+  it("continues to read Page HTML in a mixed course with URL exports", async () => {
+    const r = await readResource(client, 101, 7);
+    expect(r.data.contentStatus).toBe("available");
+  });
+  it("preserves dashboard progress rather than classifying nullable metadata as invalid", async () => {
+    const r = await readDashboard(client, { maxCourses: 1 });
+    expect(r.data.courses![0].readStatus).toBe("available");
+  });
+});

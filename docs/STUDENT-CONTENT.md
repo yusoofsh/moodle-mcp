@@ -1,4 +1,4 @@
-# Native course content and student dashboard (0.9.0)
+# Native course content and student dashboard (0.9.1)
 
 Baseline: `48d0405f9fb9912eced89d685c2d61974e0c4091` (0.8.1). This increment adds
 three high-level read-only tools, bringing the backend catalog to 21. The existing
@@ -158,3 +158,22 @@ Moodle MOODLE_405_STABLE:
   nullable metadata and private-reply export behavior.
 - calendar/externallib.php and calendar/classes/external/events_exporter.php:
   course-scoped/time-sorted action events and cursor contracts.
+
+## Live compatibility correction (0.9.1)
+
+The first live course-scoped calendar request succeeded, but forum listing exposed
+a course-contents validation error. The official Moodle 4.5 URL module exporter
+sets `filepath=null` (it is not a file directory). The new shared content schema
+initially allowed missing filepath but not null. 0.9.1 accepts that documented
+null value, without relaxing file-origin/visibility checks. Three regression cases
+cover forums, Page and dashboard in a course containing this URL descriptor; the
+workerd fixture includes it too. Other students' data and arbitrary metadata values
+are not accepted as a workaround.
+
+The initial production workflow passed its browser and SSO/import gates. This
+nullable-field correction must pass the same unchanged deployment gates. Live
+checks are repeated after deployment, rather than treating synthetic tests as
+proof of the institution's complete response shapes.
+
+Final 0.9.1 local regression checks: 312 tests across 22 files passed, with 22
+non-browser workerd groups passed. Production browser/SSO gates remain required.
