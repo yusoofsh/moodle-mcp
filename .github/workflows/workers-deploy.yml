@@ -20,12 +20,16 @@ jobs:
         with:
           bun-version: "1.4.2"
       - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run format:check
       - run: bun run check && bun run test && bun run build
       - run: bun run workers:build
+      - name: Verify document parsing in workerd
+        run: node scripts/test-document-runtime.mjs
       - name: Install browser regression runtimes
         run: bunx --no-install playwright install --with-deps chromium firefox
       - run: bun run workers:test:browser
       - run: bun run workers:test:sso
+      - run: bun audit
       - name: Deploy without changing account billing
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

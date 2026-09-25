@@ -16,6 +16,7 @@ export const readStates = [
 ] as const;
 export type ReadState = (typeof readStates)[number];
 export interface ReadWarning {
+  upstreamCode?: string;
   code: string;
   message: string;
   api?: string;
@@ -68,6 +69,10 @@ export const readOutputSchema = z.object({
       message: z.string(),
       api: z.string().optional(),
       cmid: z.number().optional(),
+      upstreamCode: z
+        .string()
+        .regex(/^[a-z0-9_]{1,64}$/)
+        .optional(),
     }),
   ),
   text: z.string(),
@@ -234,13 +239,18 @@ export async function readApi<T>(
       state,
       value: null,
       warnings: [
-        warning(
-          "READ_" + state.toUpperCase(),
-          "Moodle could not provide this read result (" +
-            state +
-            "). Permission, configuration, or connectivity may need attention.",
-          api,
-        ),
+        {
+          ...warning(
+            "READ_" + state.toUpperCase(),
+            "Moodle could not provide this read result (" +
+              state +
+              "). Permission, configuration, or connectivity may need attention.",
+            api,
+          ),
+          ...(error instanceof MoodleApiError
+            ? { upstreamCode: error.code }
+            : {}),
+        },
       ],
     };
   }

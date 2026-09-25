@@ -1,3 +1,4 @@
+import { apiCoverageSummary } from "../student/coverage-summary.js";
 import { studentOutputs } from "../student/output.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -71,6 +72,7 @@ export function registerSiteInfoTool(
         version: client.release,
         userId: client.userId,
         advertisedFunctions: [...functions].sort(),
+        apiCoverage: apiCoverageSummary(client),
         reportedFunctionCount:
           client.profile?.functions === undefined ? null : functions.size,
         catalog: {

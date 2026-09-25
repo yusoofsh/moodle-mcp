@@ -1,3 +1,5 @@
+import { registerQuizReviewTools } from "./tools/quiz-review.js";
+import { registerCoverageTools } from "./tools/coverage.js";
 import { registerContentTools } from "./tools/content.js";
 import { registerStudentTools } from "./tools/student.js";
 import { registerUrlTools } from "./tools/urls.js";
@@ -13,7 +15,6 @@ import { registerQuizTools } from "./tools/quizzes.js";
 import { registerForumTools } from "./tools/forums.js";
 import { registerNotificationTools } from "./tools/notifications.js";
 import { registerSiteInfoTool } from "./tools/siteinfo.js";
-
 export function registerAllTools(
   server: McpServer,
   client: MoodleClientSource,
@@ -30,5 +31,7 @@ export function registerAllTools(
   registerNotificationTools(server, client);
   registerStudentTools(server, client);
   registerContentTools(server, client);
+  registerCoverageTools(server, client);
+  registerQuizReviewTools(server, client);
   registerSiteInfoTool(server, client);
 }

@@ -1,0 +1,94 @@
+# SiberMu API coverage and document delivery (0.10.0)
+
+This release expands the prior 21-tool reader to 31 high-level read-only tools.
+The current authenticated site's advertised API names are the inventory source,
+not an assumed list from a different university. Upstream read/write declarations
+are pinned reference metadata, never automatic permission to expose a function.
+
+## What is implemented
+
+- Document text: PDF, DOCX, PPTX and plain text from opaque authorized file IDs.
+  Existing `moodle_download_file({fileId})` defaults to extracted structured text,
+  so a gateway dropping embedded binary resources can still receive the content.
+  `moodle_read_document` adds explicit page/slide/character-window controls;
+  `mode=raw` retains the previous byte-resource mode for capable clients.
+- Study workflows: submission-aware tasks, cross-course material metadata search,
+  daily/weekly briefing and workload groups, recent updates, released grades
+  overview and the actual assignment instruction body. Unknown submission state,
+  team submissions, individual extensions and partial course/status pages remain
+  explicit; missing information is never proof of overdue work or no requirements.
+- Finished quiz review: only the current account's verified finished non-preview
+  attempts, subject to Moodle's released review information. No quiz is started,
+  advanced, answered, flagged or submitted by these readers.
+- Broader read adapters: current-account profile/preferences, groups, participants,
+  badges, messages/conversations/contacts, grades, calendar views, competencies and
+  learning plans, plus metadata and reviewed reads for standard activity families.
+  `moodle_read_api` dispatches only a finite explicit registry with strict per-API
+  inputs and injected account identity. It is NOT arbitrary Moodle REST execution.
+- Coverage inventory: `moodle_get_api_coverage` includes exact implemented adapter
+  inputs and unexposed operations. The existing site-info tool also includes a
+  compact `apiCoverage` summary, making measurements available to old tool caches.
+
+No token, password, scope, Durable Object binding/migration or university setting
+is changed. No submission, message, grade, attendance mark, view/read receipt,
+policy acceptance or account mutation is used merely as a live test.
+
+## Meaning of coverage
+
+1. Inventory coverage: all function names returned by this particular token have
+   an entry in the report. 100% here does NOT mean the integration implements them.
+2. Function route coverage: at least one implemented high-level call or reviewed
+   adapter exists for that function. It does not prove every parameter combination,
+   result field, role or end-user workflow is covered.
+3. Declared read route coverage: the above routes intersected with upstream APIs
+   declared read-only. Some declared reads still have side effects, require staff
+   permissions or expose credentials; these are not automatically allowed.
+4. Live coverage: a separately recorded set of actual Composio calls and outcomes.
+   Registration, unit fixtures and an advertised function do not count as a live
+   success. Functional workflow coverage and live API counts are not fabricated.
+
+The original 450-function SiberMu inventory includes writes, view events, mobile
+credential issuance, proctoring/custom plugins and staff-only operations. They
+remain visible as gaps, not silently reclassified as implemented. Attendance's
+standard session API was not advertised at the last live read. The mobile view
+handler is not a substitute: it can automatically record presence.
+
+## Resource and execution boundaries
+
+Parser input is capped at 4 MiB and additionally by the configured download limit
+(default 2 MiB). PDF text-layer extraction supports a bounded window (default
+3 pages, maximum 10; maximum 500 document pages). Explicit nextPage/nextCharOffset
+allow continuation. There is no OCR, image/chart interpretation or rendered table
+reconstruction, and no claim to handle every large/scanned document.
+
+OOXML processing rejects encrypted/unsafe/duplicate ZIP paths and external slide
+relationships, caps entries and decompressed XML, and reads only relevant text
+parts. It never executes macros or document fields. The PDF parser disables remote
+assets, font fetching, auto-fetch, streaming and WASM. Extraction is single-flight;
+the cooperative time limit is not a preemptive CPU guarantee for arbitrary input.
+
+Read-adapter inputs are strict: callers cannot inject raw URLs, choose another
+student's user ID, change function names through extra parameters, or override a
+verified instance ID. Course/module visibility is rechecked before scoped reads.
+Output metadata is size-bounded, sanitized, marked untrusted and explicitly partial
+when paged or truncated. Upstream data must never be treated as agent instructions.
+
+## Reproducible delivery
+
+The recovered development implementation at 408afc7 passed 479 Node tests, three
+workerd document-parser cases, 25 authenticated workerd/browser groups and four
+SSO/import groups. Those are synthetic tests, not private university acceptance.
+
+Temporary source-rewriting scripts were removed. The verification workflow is now
+read-only: it does not generate code, change the lockfile, or push commits during
+validation. Production and OCI workflows also require the document runtime gate.
+The exact final commit must pass these gates before it is reported deployed.
+
+New tool names may require a client/Composio schema refresh. A stale cached
+connector can still call the existing site-info and download tools to verify the
+new coverage measurements and extracted content. Live results are recorded after
+actual deployment; no assumption is made that all new tool names are callable.
+
+Still outside this release: write workflows and their confirmation/authorization
+lifecycle, teacher/admin parity, unreviewed custom plugins, OCR/large-file support,
+and complete parameter-level coverage of every exposed Moodle API.

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "moodle-mcp",
   "display_name": "Moodle MCP",
-  "version": "0.9.2",
+  "version": "0.10.0",
   "description": "Give Claude access to your Moodle courses, assignments, grades, quizzes, calendar, forums, and notifications.",
   "long_description": "Moodle MCP connects Claude to any Moodle LMS instance. Ask about upcoming deadlines, check your grades, browse course resources, read assignment feedback, and more — all in natural language.\n\nSupports token-based auth (recommended) or username/password login.",
   "author": {
@@ -16,13 +16,22 @@
   "homepage": "https://github.com/1alexandrer/moodle-mcp#readme",
   "support": "https://github.com/1alexandrer/moodle-mcp/issues",
   "license": "MIT",
-  "keywords": ["moodle", "education", "lms", "courses", "grades", "assignments"],
+  "keywords": [
+    "moodle",
+    "education",
+    "lms",
+    "courses",
+    "grades",
+    "assignments"
+  ],
   "server": {
     "type": "node",
     "entry_point": "dist/server.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/dist/server.js"],
+      "args": [
+        "${__dirname}/dist/server.js"
+      ],
       "env": {
         "MOODLE_URL": "${user_config.moodle_url}",
         "MOODLE_TOKEN": "${user_config.moodle_token}",
@@ -60,30 +69,136 @@
     }
   },
   "tools": [
-    { "name": "moodle_get_resource", "description": "Read a visible Page, Book chapter, Folder, File or Text/media resource" },
-    { "name": "moodle_get_forum_thread", "description": "Read permitted forum posts and replies without marking read" },
-    { "name": "moodle_get_dashboard", "description": "Read bounded student progress and action timeline summaries" },
-    { "name": "moodle_download_file", "description": "Download a currently visible course file using its opaque fileId" },
-    { "name": "moodle_get_activity_completion", "description": "Read current student activity completion and scoped progress without marking completion" },
-    { "name": "moodle_get_course_completion", "description": "Read current student course completion and criteria, distinguishing unavailable from incomplete" },
-    { "name": "moodle_get_attendance", "description": "Read visible Attendance inventory and permitted self-only session records without marking attendance" },
-    { "name": "moodle_get_site_info", "description": "Get information about your Moodle server and account" },
-    { "name": "moodle_list_courses", "description": "List all Moodle courses you are enrolled in" },
-    { "name": "moodle_get_course", "description": "Get sections and modules of a specific course" },
-    { "name": "moodle_list_resources", "description": "List all downloadable files and links in a course" },
-    { "name": "moodle_resolve_url", "description": "Resolve a visible URL activity moduleId to its actual HTTP(S) externalurl, without fetching the target" },
-    { "name": "moodle_list_assignments", "description": "List all assignments in a course with due dates and grade info" },
-    { "name": "moodle_get_assignment", "description": "Get submission status and grade feedback for an assignment" },
-    { "name": "moodle_get_grades", "description": "Get your full grade report for a course" },
-    { "name": "moodle_get_calendar_events", "description": "Get upcoming calendar events filtered by date or course" },
-    { "name": "moodle_list_quizzes", "description": "List all quizzes in a course with attempt counts and dates" },
-    { "name": "moodle_get_quiz_attempts", "description": "Get your attempt history for a specific quiz" },
-    { "name": "moodle_list_forums", "description": "List all forum activities in a course" },
-    { "name": "moodle_get_forum_discussions", "description": "Get recent discussions in a forum" },
-    { "name": "moodle_get_notifications", "description": "Get your recent Moodle notifications" }
+    {
+      "name": "moodle_list_courses",
+      "description": "List current student enrolments with structured course IDs, dates and reported completion/progress. Missing progress is unknown. Optional offset/limit page the locally fetched enrolment list."
+    },
+    {
+      "name": "moodle_get_course",
+      "description": "Read current visible sections/modules with distinct cmid and instanceId, restrictions, dates and reported activity completion. Includes a visible-activity progress summary and Attendance activity count; no state changes. Returns structured JSON and equivalent text."
+    },
+    {
+      "name": "moodle_list_resources",
+      "description": "List all downloadable files and links in a course, grouped by the course's own sections (weeks, chapters, topics — as defined by the professor). Each file gets an opaque fileId you pass to moodle_download_file to read contents. URL activities include their actual externalurl and moduleId when Moodle permits resolution, with the activity wrapper kept separately. Missing targets are labelled unresolved. External sites are not fetched."
+    },
+    {
+      "name": "moodle_resolve_url",
+      "description": "Resolve a visible Moodle URL activity to its actual HTTP(S) externalurl (for example a YouTube recording), not the mod/url/view.php wrapper. moduleId is the course-module/activity ID, not the URL instance ID. Optional courseId avoids a module-lookup API call. Returns structured data and equivalent JSON text; resolved=false explains missing capabilities or unavailable targets. Does not fetch, transcribe, or follow the external site and never forwards Moodle credentials."
+    },
+    {
+      "name": "moodle_download_file",
+      "description": "Read an authorized course file by its opaque fileId. Default auto mode now returns extracted PDF/DOCX/PPTX/plain text with explicit pagination, avoiding dropped binary resources in gateways. mode=raw retains embedded bytes for capable clients; no raw URL or Moodle token is returned. Max file size remains configured. Scans are not OCRed. Reuse startPage/charOffset for continuation."
+    },
+    {
+      "name": "moodle_read_document",
+      "description": "Extract bounded PDF, DOCX, PPTX or plain-text content using an opaque authorized fileId. PDF pages and slide order preserved; DOCX uses one logical document. No scripts/macros, remote assets, OCR, image/table rendering. Truncation and page/character continuation explicit. Extraction is single-flight."
+    },
+    {
+      "name": "moodle_list_assignments",
+      "description": "Read visible course assignments with correct assignmentId/instanceId and cmid, effective due/open/cutoff dates in Unix seconds and ISO UTC, grading type, explicit unknown states and warnings. Structured JSON is authoritative; text is included for gateways. Optional offset/limit paginate the locally fetched visible list. Does not submit or change anything."
+    },
+    {
+      "name": "moodle_get_assignment",
+      "description": "Read the authenticated student’s latest assignment submission/team status, individual deadline extension and released grade feedback. Uses assignmentId (not cmid). Missing results stay unknown rather than Not submitted. Returns structured JSON and text; no submission or grading actions."
+    },
+    {
+      "name": "moodle_get_grades",
+      "description": "Get your full grade report for a course — all graded items, categories, percentages, and feedback."
+    },
+    {
+      "name": "moodle_get_calendar_events",
+      "description": "Read current-user Moodle action events in a bounded window (default next 30 days), with ISO UTC dates, course IDs, past/upcoming distinction and upstream pagination. Optional courseId uses course-specific API pagination. Reuse returned from/to and afterEventId for next page. This is an action timeline, not all personal/group/site calendar entries; past opening events are not automatically overdue tasks. Never creates or edits events."
+    },
+    {
+      "name": "moodle_list_quizzes",
+      "description": "List all quizzes in a course, grouped by section, with time limits, attempt counts, and open/close dates."
+    },
+    {
+      "name": "moodle_get_quiz_attempts",
+      "description": "Get your past attempt history for a specific quiz — grades, states, and timing."
+    },
+    {
+      "name": "moodle_list_forums",
+      "description": "List visible course forums with correct instance forumId (not cmid), separate course-module ID, type and readable introduction. Optional bounded local pagination. Never views/marks a forum or subscribes."
+    },
+    {
+      "name": "moodle_get_forum_discussions",
+      "description": "Read a page of permitted forum discussions with discussionId, firstPostId, author, readable first-post body and links. forumId is the instance ID from moodle_list_forums, not cmid. Use moodle_get_forum_thread(discussionId) for replies. Preserves Moodle groups/timed/Q&A restrictions; no read receipts, view events or writes."
+    },
+    {
+      "name": "moodle_get_forum_thread",
+      "description": "Read permitted posts/replies in one discussion with parent IDs, readable text and safe links. Revalidates the current forum context, excludes deleted/non-viewable posts, and never marks anything as read or posts a reply. Attachment metadata only; attachment bytes are not yet supported. offset/limit are local output pagination; upstream response remains bounded."
+    },
+    {
+      "name": "moodle_get_notifications",
+      "description": "Get your recent Moodle notifications (grade returns, assignment feedback, forum replies, etc.). Unread items are marked with 🔵."
+    },
+    {
+      "name": "moodle_get_activity_completion",
+      "description": "Read the current student’s activity completion for visible course modules, with manual/automatic/not-tracked/unknown distinctions, completion rules and a scoped progress summary. Attempts the completion read API and falls back to already-authorized course-content completion fields. Never marks completion. Does not accept another userId."
+    },
+    {
+      "name": "moodle_get_course_completion",
+      "description": "Read Moodle’s course-completion decision and criteria for the authenticated student. This is distinct from an activity percentage. Not configured, forbidden, unavailable and incomplete remain different states. Never self-completes a course and never accepts another userId."
+    },
+    {
+      "name": "moodle_get_attendance",
+      "description": "Read visible Attendance activity inventory for a course. Supply moduleId (cmid) to attempt the plugin’s advertised session-read API for that one activity; return only the current student’s records when Moodle permits. Missing API or denied permissions are reported explicitly, never as absent. No attendance marking, QR/password processing or mobile-content handler calls (mobile views can auto-mark presence)."
+    },
+    {
+      "name": "moodle_get_resource",
+      "description": "Read visible Page, Book chapter, Text/media label, Folder or File resource. Uses moduleId (cmid), optional courseId; Book chapterId selects one chapter, otherwise first visible chapter. Returns plain-text body separately from introduction, chapter table of contents and paginated file inventory with opaque fileIds. Only bounded Moodle-exported HTML is fetched; no browser view/completion calls or external requests. PDF/DOCX extraction is not performed. Source text is untrusted data."
+    },
+    {
+      "name": "moodle_get_dashboard",
+      "description": "Read a bounded student dashboard: a page of enrolled courses with visible-activity progress and a current-user action timeline. maxCourses defaults to 3, max 5; courseOffset pages the summaries. Calendar range/cursor is separate, may be partial, and is not the full personal/site calendar. Does not assume past opening events are missed deadlines or fetch each assignment submission. No writes or Attendance view handlers."
+    },
+    {
+      "name": "moodle_read_api",
+      "description": "Invoke ONE explicitly reviewed read-only Moodle adapter. Use moodle_get_api_coverage(includeInputSchemas=true) to see allowed functionName/parameters. This is not arbitrary REST passthrough: writes, views, attempts, token generation and unknown functions are blocked. User identity is injected; callers cannot choose another user or URL. Course/module visibility is rechecked. Bounded raw metadata is sanitized and may be partial."
+    },
+    {
+      "name": "moodle_get_api_coverage",
+      "description": "Inventory the actual advertised Moodle API functions, implemented routes, unexposed operations and upstream read/write declarations. Inventory coverage is NOT functional or live-test coverage. Optionally return exact parameter schemas for reviewed read adapters. Does not probe or execute listed APIs."
+    },
+    {
+      "name": "moodle_get_tasks",
+      "description": "Submission-aware task priorities across a bounded course/assignment page. Reads self/team status and individual extensions before calling work overdue. Distinguishes disabled, submitted, unknown and not_checked; no false overdue from missing data. Follow coverage.nextAssignmentOffset before nextCourseOffset. Defaults 3 courses/10 statuses, max5/20. No submissions or views."
+    },
+    {
+      "name": "moodle_search_materials",
+      "description": "Search visible course section/activity/file names and bounded module descriptions. Unicode-aware all-term metadata search; not a PDF full-text index. Returns precise course/module IDs, snippets, coverage and continuation. Does not download every file or query an external search engine."
+    },
+    {
+      "name": "moodle_get_briefing",
+      "description": "Daily or weekly student summary combining submission-aware tasks, action timeline, released grade overview and known pending workload by UTC week. Paging/unknowns remain explicit; no fabricated effort estimates or claims that a bounded page is the entire semester."
+    },
+    {
+      "name": "moodle_get_recent_activity",
+      "description": "Read Moodle update metadata since a timestamp for a bounded page of visible courses. Defaults to seven days, maximum90. Does not mark modules viewed or notifications read. Missing/denied courses are recorded as unavailable, not silently empty."
+    },
+    {
+      "name": "moodle_get_assignment_details",
+      "description": "Read the actual assignment instruction body after validating course/cmid/assignment identity. Returns bounded untrusted text and attachment metadata; does not invent requirement priorities, rubric interpretation or a submission plan. Attachment download support is explicit."
+    },
+    {
+      "name": "moodle_get_grades_overview",
+      "description": "Read the current account grade overview across courses. Retains original grade scales and does not compute a fabricated GPA or treat missing grades as zero."
+    },
+    {
+      "name": "moodle_get_quiz_review",
+      "description": "Review one page of a verified finished non-preview quiz attempt belonging to the authenticated student. Requires courseId and quiz instance quizId; omitted attemptId selects latest finished attempt. Honors Moodle review restrictions and withholds grades when marks are not released. Does not start/read active-attempt data, save answers, flag questions, submit or trigger view events. Output is untrusted learning content."
+    },
+    {
+      "name": "moodle_get_site_info",
+      "description": "Read Moodle site/current account information and the backend tool catalog with required/optional Web Service advertisement. Includes completion and Attendance API diagnostics. Advertised is not proof of role/context authorization; a connector may cache an older catalog. Never returns tokens."
+    }
   ],
   "compatibility": {
-    "platforms": ["darwin", "win32"],
+    "platforms": [
+      "darwin",
+      "win32"
+    ],
     "runtimes": {
       "node": ">=24.0.0"
     }
