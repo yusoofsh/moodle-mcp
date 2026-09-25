@@ -247,8 +247,9 @@ export async function readCalendar(
           }
         : null,
     })) ?? null;
-  const last =
-    fallbackUsed ? null : (primary.value?.lastid ?? raw?.at(-1)?.id ?? null);
+  const last = fallbackUsed
+    ? null
+    : (primary.value?.lastid ?? raw?.at(-1)?.id ?? null);
   const mayHaveMore =
     raw === null
       ? null
