@@ -1,3 +1,8 @@
+import {
+  resolveCourseUrls,
+  isUserVisible,
+  type ResolvedUrl,
+} from "../url-resolver.js";
 import type { MoodleClientSource } from "../moodle-source.js";
 import {
   canRegister,
@@ -22,12 +27,15 @@ interface CourseModule {
   name: string;
   modname: string;
   url?: string;
+  instance?: number;
+  uservisible?: boolean | number;
   contents?: ModuleContent[];
 }
 
 interface CourseSection {
   id: number;
   name: string;
+  uservisible?: boolean | number;
   modules: CourseModule[];
 }
 
@@ -39,10 +47,10 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function listResources(
+export async function listResources(
   client: MoodleClient,
   courseId: number,
-): Promise<string> {
+): Promise<{ text: string; links: ResolvedUrl[] }> {
   const sections = await client.call<CourseSection[]>(
     "core_course_get_contents",
     {
@@ -50,11 +58,14 @@ async function listResources(
     },
   );
 
+  const urls = await resolveCourseUrls(client, courseId, sections);
   const lines: string[] = [`## Files — Course ${courseId}\n`];
   let hasFiles = false;
 
-  for (const section of sections) {
-    const fileMods = section.modules.filter((m) => FILE_MODS.has(m.modname));
+  for (const section of sections.filter(isUserVisible)) {
+    const fileMods = section.modules.filter(
+      (m) => isUserVisible(m) && FILE_MODS.has(m.modname),
+    );
     if (fileMods.length === 0) continue;
 
     lines.push(`### ${section.name || "General"}`);
@@ -62,13 +73,16 @@ async function listResources(
 
     for (const mod of fileMods) {
       if (mod.modname === "url") {
-        // External link (not a Moodle-hosted file). Safe to show as-is — it's
-        // whatever the professor linked, and moodle_download_file cannot fetch it.
-        if (mod.url) {
-          lines.push(`- 🔗 [${mod.name}](${mod.url}) *(external)*`);
-        } else {
-          lines.push(`- 🔗 **${mod.name}** *(external)*`);
-        }
+        const link = urls.get(mod.id)!;
+        // Render the real target in plain text too: gateways may omit structuredContent.
+        const title = mod.name.replace(/[\r\n]/g, " ");
+        lines.push(`- **${title}** — moduleId: \`${mod.id}\``);
+        if (link.resolved) lines.push(`  externalurl: ${link.externalurl}`);
+        else
+          lines.push(
+            `  externalurl: unavailable (${link.reason}); not resolved to an external destination.`,
+          );
+        lines.push(`  Moodle activity: ${link.activityUrl}`);
         continue;
       }
       if (!mod.contents || mod.contents.length === 0) {
@@ -95,11 +109,12 @@ async function listResources(
     lines.push("");
   }
 
-  if (!hasFiles) return "No downloadable files found in this course.";
+  if (!hasFiles)
+    return { text: "No downloadable files found in this course.", links: [] };
   lines.push(
     "_Call `moodle_download_file` with a fileId above to read the file's contents._",
   );
-  return lines.join("\n");
+  return { text: lines.join("\n"), links: [...urls.values()] };
 }
 
 export function registerFileTools(
@@ -111,20 +126,27 @@ export function registerFileTools(
       "moodle_list_resources",
       {
         description:
-          "List all downloadable files and links in a course, grouped by the course's own sections (weeks, chapters, topics — as defined by the professor). Each file gets an opaque fileId you pass to moodle_download_file to read contents. External URL-module links are shown as-is.",
+          "List all downloadable files and links in a course, grouped by the course's own sections (weeks, chapters, topics — as defined by the professor). Each file gets an opaque fileId you pass to moodle_download_file to read contents. URL activities include their actual externalurl and moduleId when Moodle permits resolution, with the activity wrapper kept separately. Missing targets are labelled unresolved. External sites are not fetched.",
         inputSchema: z.object({
-          courseId: z.number().describe("Course ID from moodle_list_courses"),
+          courseId: z
+            .number()
+            .int()
+            .positive()
+            .max(Number.MAX_SAFE_INTEGER)
+            .describe("Course ID from moodle_list_courses"),
         }),
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
       async ({ courseId }) => {
         const client = await getToolClient(source, "moodle_list_resources");
+        const result = await listResources(client, courseId);
         return {
+          structuredContent: { courseId, links: result.links },
           content: [
             {
               type: "text" as const,
-              text: await listResources(client, courseId),
+              text: result.text,
             },
           ],
         };

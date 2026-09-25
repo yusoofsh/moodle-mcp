@@ -18,7 +18,7 @@ describe("read-only tools and file access", () => {
       "moodle_get_site_info",
     ]);
   });
-  it("registers 14 tools with read-only and OAuth annotations", () => {
+  it("registers 15 tools with read-only and OAuth annotations", () => {
     const registerTool = vi.fn();
     registerAllTools(
       { registerTool } as unknown as McpServer,

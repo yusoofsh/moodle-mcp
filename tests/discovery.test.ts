@@ -45,7 +45,7 @@ async function upstream(functions: string[]) {
   });
 }
 describe("MCP discovery is independent from Moodle availability", () => {
-  it("initializes and discovers all 14 tools without invoking the upstream factory", async () => {
+  it("initializes and discovers all 15 tools without invoking the upstream factory", async () => {
     const create = vi
       .fn()
       .mockRejectedValue(
@@ -82,7 +82,7 @@ describe("MCP discovery is independent from Moodle availability", () => {
     expect(response.isError).toBe(true);
     expect(JSON.stringify(response)).toContain("MOODLE");
     expect(JSON.stringify(response)).not.toContain("fixture-secret");
-    expect((await client.listTools()).tools).toHaveLength(14);
+    expect((await client.listTools()).tools).toHaveLength(15);
   });
   it("checks API capabilities when a tool runs without changing the advertised catalog", async () => {
     const actual = await upstream([]);
@@ -95,7 +95,7 @@ describe("MCP discovery is independent from Moodle availability", () => {
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain("core_enrol_get_users_courses");
     expect(call).not.toHaveBeenCalled();
-    expect((await client.listTools()).tools).toHaveLength(14);
+    expect((await client.listTools()).tools).toHaveLength(15);
     const info = await client.callTool({
       name: "moodle_get_site_info",
       arguments: {},

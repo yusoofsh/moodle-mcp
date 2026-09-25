@@ -17,6 +17,7 @@ export const TOOL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_list_courses: ["core_enrol_get_users_courses"],
   moodle_get_course: ["core_course_get_contents"],
   moodle_list_resources: ["core_course_get_contents"],
+  moodle_resolve_url: ["core_course_get_contents"],
   moodle_download_file: ["core_course_get_contents"],
   moodle_list_assignments: [
     "core_course_get_contents",

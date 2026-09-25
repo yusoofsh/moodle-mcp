@@ -2,11 +2,11 @@
 
 ## Cloudflare Workers Free — 0.5.0
 
-The password/OAuth application can now run in a SQLite-backed Durable Object without Docker or a VPS. See [the Workers deployment and migration guide](docs/CLOUDFLARE.md). All 14 read-only Moodle tools remain, subject to Moodle permissions and Worker-specific limits. Generate a compatible hash with `bun run password:hash --workers`. Container support below is retained.
+The password/OAuth application can now run in a SQLite-backed Durable Object without Docker or a VPS. See [the Workers deployment and migration guide](docs/CLOUDFLARE.md). All 15 read-only Moodle tools remain, subject to Moodle permissions and Worker-specific limits. Generate a compatible hash with `bun run password:hash --workers`. Container support below is retained.
 
 Read-only access to your Moodle account from ChatGPT or another MCP client, without installing a Moodle plugin. This MIT-licensed fork of [1alexandrer/moodle-mcp](https://github.com/1alexandrer/moodle-mcp) adds a container-hosted OAuth authorization server and hardens remote access.
 
-**Current scope:** single Moodle account, one password-authenticated owner (or an explicitly selected GitHub owner), 14 student-facing tools. This is an OAuth/OCI foundation release, not complete Moodle API coverage. [Triage and follow-up work](docs/TRIAGE.md) · [Review record](docs/REVIEW.md) · [Security model](SECURITY.md).
+**Current scope:** single Moodle account, one password-authenticated owner (or an explicitly selected GitHub owner), 15 student-facing tools. This is an OAuth/OCI foundation release, not complete Moodle API coverage. [Triage and follow-up work](docs/TRIAGE.md) · [Review record](docs/REVIEW.md) · [Security model](SECURITY.md).
 
 ## Architecture
 
@@ -120,7 +120,7 @@ Password attempts are limited to **5 per IP per 15 minutes** and **30 total per 
 
 ## Available tools
 
-Authenticated HTTP/Workers discovery returns a stable catalog of 14 read-only tools without contacting Moodle. The connection and required web-service capabilities are checked when each tool runs, so a university outage or invalid Moodle token cannot hide the tool list. `moodle_get_site_info` reports availability for the configured token. Already-connected stdio clients still filter the list by reported capabilities. Advertising a tool never grants Moodle permissions.
+Authenticated HTTP/Workers discovery returns a stable catalog of 15 read-only tools without contacting Moodle. The connection and required web-service capabilities are checked when each tool runs, so a university outage or invalid Moodle token cannot hide the tool list. `moodle_get_site_info` reports availability for the configured token. Already-connected stdio clients still filter the list by reported capabilities. Advertising a tool never grants Moodle permissions.
 
 | Tool                                                 | Function                                                        |
 | ---------------------------------------------------- | --------------------------------------------------------------- |
@@ -177,3 +177,16 @@ encrypted. See [setup, security boundaries, and browser limitations](docs/SSO-ON
 The institution’s final custom-scheme handoff requires a live user acceptance test.
 
 For an app link that did not return automatically, use **Import copied Moodle link** on the owner setup page. See [the owner-approved import guide](docs/COPIED-LINK-IMPORT.md). No Google password or manual Cloudflare secret edit is needed.
+
+## URL activities and recording links (0.7.0)
+
+`moodle_list_resources({courseId})` now includes each visible URL activity's
+`moduleId`, actual `externalurl`, and separate Moodle `activityUrl`. It returns
+these in text and `structuredContent.links`, so text-only connectors can read them.
+`moodle_resolve_url({moduleId, courseId?})` resolves one activity and returns an
+equivalent JSON text/structured result. For a course known to the client, supplying
+`courseId` avoids an extra module lookup. See [URL resolution](docs/URL-RESOLUTION.md).
+
+This returns the destination configured by the teacher; it does not fetch that
+site, follow redirects, transcribe videos, or send Moodle credentials downstream.
+Use only `resolved: true` targets for a separate permitted transcription workflow.

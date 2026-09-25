@@ -60,8 +60,62 @@ async function start(override = {}) {
             release: "4.5",
             functions: (upstreamMode === "no-capabilities"
               ? []
-              : [...new Set(Object.values(TOOL_FUNCTIONS).flat())]
+              : [
+                  ...new Set([
+                    ...Object.values(TOOL_FUNCTIONS).flat(),
+                    "mod_url_get_urls_by_courses",
+                    "core_course_get_course_module",
+                  ]),
+                ]
             ).map((name) => ({ name, version: "1" })),
+          });
+        case "core_course_get_course_module":
+          assert.equal(params.get("cmid"), "201");
+          return Response.json({ cm: { id: 201, course: 7, modname: "url" } });
+        case "core_course_get_contents":
+          assert.equal(params.get("courseid"), "7");
+          return Response.json([
+            {
+              id: 1,
+              name: "Recordings",
+              modules: [
+                {
+                  id: 201,
+                  instance: 61,
+                  name: "Tutor 1",
+                  modname: "url",
+                  uservisible: true,
+                },
+                {
+                  id: 202,
+                  instance: 62,
+                  name: "Hidden recording",
+                  modname: "url",
+                  uservisible: false,
+                },
+              ],
+            },
+          ]);
+        case "mod_url_get_urls_by_courses":
+          assert.equal(params.get("courseids[0]"), "7");
+          return Response.json({
+            urls: [
+              {
+                id: 61,
+                coursemodule: 201,
+                course: 7,
+                name: "Tutor 1",
+                externalurl: "https://www.youtube.com/watch?v=example1234&t=42",
+              },
+              {
+                id: 62,
+                coursemodule: 202,
+                course: 7,
+                name: "Hidden recording",
+                externalurl: "https://example.org/never-disclose",
+              },
+            ],
+            warnings: [],
           });
         case "core_enrol_get_users_courses":
           return Response.json([
@@ -319,7 +373,7 @@ try {
     assert.equal((await exchange(id, replay)).status, 400);
   });
   await check(
-    "MCP initialize, all 14 read-only tools, Moodle request",
+    "MCP initialize, all 15 read-only tools, Moodle request",
     async () => {
       const init = await rpc(granted.access_token, "initialize", {
         protocolVersion: "2025-11-25",
@@ -329,7 +383,7 @@ try {
       assert.equal(init.status, 200, init.text);
       const tools = await rpc(granted.access_token, "tools/list", {});
       assert.equal(tools.status, 200, tools.text);
-      assert.equal(tools.json.result.tools.length, 14);
+      assert.equal(tools.json.result.tools.length, 15);
       assert.ok(
         tools.json.result.tools.every((t) => t.annotations.readOnlyHint),
       );
@@ -340,6 +394,42 @@ try {
       assert.equal(result.status, 200, result.text);
       assert.match(result.text, /Sample course/);
       assert.ok(!result.text.includes(bindings.MOODLE_TOKEN));
+    },
+  );
+  await check(
+    "authenticated URL resolution and batch resource enrichment stay read-only",
+    async () => {
+      const resolved = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_resolve_url",
+        arguments: { moduleId: 201 },
+      });
+      assert.equal(resolved.status, 200, resolved.text);
+      assert.equal(
+        resolved.json.result.structuredContent.externalurl,
+        "https://www.youtube.com/watch?v=example1234&t=42",
+      );
+      assert.deepEqual(
+        JSON.parse(resolved.json.result.content[0].text),
+        resolved.json.result.structuredContent,
+      );
+      const resources = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_list_resources",
+        arguments: { courseId: 7 },
+      });
+      assert.equal(resources.status, 200, resources.text);
+      assert.equal(resources.json.result.structuredContent.links.length, 1);
+      assert.match(
+        resources.json.result.content[0].text,
+        /externalurl: https:\/\/www.youtube.com/,
+      );
+      assert.ok(!resources.text.includes("never-disclose"));
+      assert.ok(!resources.text.includes(bindings.MOODLE_TOKEN));
+      const hidden = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_resolve_url",
+        arguments: { moduleId: 202, courseId: 7 },
+      });
+      assert.equal(hidden.json.result.isError, true);
+      assert.ok(!hidden.text.includes("never-disclose"));
     },
   );
   await check(
@@ -366,7 +456,7 @@ try {
       }
       const listing = await rpc(granted.access_token, "tools/list", {});
       assert.equal(listing.status, 200, listing.text);
-      assert.equal(listing.json.result.tools.length, 14);
+      assert.equal(listing.json.result.tools.length, 15);
       for (const tool of listing.json.result.tools) {
         assert.ok(
           !Object.hasOwn(tool, "execution"),
@@ -418,7 +508,7 @@ try {
       try {
         await sdkClient.connect(transport);
         const listing = await sdkClient.listTools();
-        assert.equal(listing.tools.length, 14);
+        assert.equal(listing.tools.length, 15);
         const result = await sdkClient.callTool({
           name: "moodle_list_courses",
           arguments: {},
@@ -438,7 +528,7 @@ try {
       await start();
       const listing = await rpc(granted.access_token, "tools/list", {});
       assert.equal(listing.status, 200);
-      assert.equal(listing.json.result.tools.length, 14);
+      assert.equal(listing.json.result.tools.length, 15);
       const denied = await rpc(granted.access_token, "tools/call", {
         name: "moodle_list_courses",
         arguments: {},
@@ -463,7 +553,7 @@ try {
     await start();
     const result = await rpc(granted.access_token, "tools/list", {});
     assert.equal(result.status, 200, result.text);
-    assert.equal(result.json.result.tools.length, 14);
+    assert.equal(result.json.result.tools.length, 15);
   });
   await check("refresh rotation and replay family revocation", async () => {
     const refresh = (value) =>
