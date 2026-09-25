@@ -41,24 +41,18 @@ jobs:
       - run: bun run workers:test:browser
       - run: bun run workers:test:sso
       - run: bun audit
-      - name: Package source and dependencies for offline verification
+      - name: Export credential-free review snapshot
         if: always()
         run: |
           set -euo pipefail
-          mkdir -p offline-runtime
-          cp "$(command -v node)" offline-runtime/node
-          cp "$(command -v bun)" offline-runtime/bun
-          git rev-parse HEAD > offline-runtime/source-revision.txt
-          tar -czf /tmp/moodle-offline-test.tgz \
-            --exclude='node_modules/.cache' \
-            src tests scripts node_modules offline-runtime \
-            package.json manifest.json bun.lock tsconfig.json vitest.config.ts wrangler.toml \
-            README.md SECURITY.md docs compose.yaml
+          node scripts/export-review-sources.mjs
+          git rev-parse HEAD > offline-review/project-revision.txt
+          tar -czf /tmp/moodle-source-review.tgz src tests scripts offline-review .github/workflows package.json manifest.json bun.lock tsconfig.json vitest.config.ts wrangler.toml README.md SECURITY.md docs compose.yaml
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: moodle-offline-test
-          path: /tmp/moodle-offline-test.tgz
+          name: moodle-source-review
+          path: /tmp/moodle-source-review.tgz
           retention-days: 1
           compression-level: 0
           if-no-files-found: error
