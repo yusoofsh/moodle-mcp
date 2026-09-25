@@ -50,7 +50,7 @@ export const TOOL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_get_assignment_details: ["core_course_get_contents"],
   moodle_get_grades_overview: [],
 };
-export const TOOL_CATALOG_VERSION = "0.10.1";
+export const TOOL_CATALOG_VERSION = "0.10.2";
 export const TOOL_OPTIONAL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_get_resource: ["core_course_get_course_module"],
   moodle_get_forum_thread: [
@@ -61,10 +61,12 @@ export const TOOL_OPTIONAL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_get_calendar_events: [
     "core_calendar_get_action_events_by_timesort",
     "core_calendar_get_action_events_by_course",
+    "core_calendar_get_action_events_by_courses",
   ],
   moodle_get_dashboard: [
     "core_course_get_contents",
     "core_calendar_get_action_events_by_timesort",
+    "core_calendar_get_action_events_by_courses",
   ],
   moodle_list_assignments: ["mod_assign_get_assignments"],
   moodle_get_activity_completion: [
@@ -98,6 +100,8 @@ export const TOOL_OPTIONAL_FUNCTIONS: Record<string, readonly string[]> = {
     "mod_assign_get_assignments",
     "mod_assign_get_submission_status",
     "core_calendar_get_action_events_by_timesort",
+    "core_calendar_get_action_events_by_course",
+    "core_calendar_get_action_events_by_courses",
     "gradereport_overview_get_course_grades",
   ],
   moodle_get_recent_activity: [
