@@ -1,0 +1,39 @@
+name: Verify student coverage development
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: coverage-development
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/feat/sibermu-api-coverage'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.4.2'
+      - name: Resolve pinned dependencies and formatting on development branch
+        run: |
+          bun install --ignore-scripts
+          bun run format
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bun.lock package.json src tests scripts README.md SECURITY.md docs
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: resolve dependency lock and formatting for coverage tests'
+            git push origin HEAD:feat/sibermu-api-coverage
+          fi
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run check && bun run test && bun run build
+      - run: bun run workers:build
+      - run: bunx --no-install playwright install --with-deps chromium firefox
+      - run: bun run workers:test:browser
+      - run: bun run workers:test:sso
+      - run: bun audit
