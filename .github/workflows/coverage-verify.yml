@@ -22,6 +22,7 @@ jobs:
       - name: Persist generated reference metadata, manifest and dependency lock
         run: |
           bun install --ignore-scripts
+          node scripts/refine-coverage-contract.mjs
           node scripts/generate-api-declarations.mjs
           bun scripts/refresh-tool-manifest.ts
           bun run format
@@ -29,7 +30,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add bun.lock manifest.json package.json src tests scripts README.md SECURITY.md docs
           if ! git diff --cached --quiet; then
-            git commit -m 'chore: refresh API declaration index, manifest and formatting'
+            git commit -m 'chore: refresh coverage contracts and generated metadata'
             git push origin HEAD:feat/sibermu-api-coverage
           fi
       - run: bun install --frozen-lockfile --ignore-scripts
