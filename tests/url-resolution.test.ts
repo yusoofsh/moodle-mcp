@@ -277,6 +277,10 @@ describe("authenticated Moodle URL resolution", () => {
     expect(JSON.stringify(r.content)).toContain(destination);
     expect(JSON.stringify(r.content)).toContain("moduleId: `201`");
     expect(JSON.stringify(r.content)).toContain("f_synthetic");
+    expect(r.structuredContent?.text).toBe(
+      (r.content as { text: string }[])[0].text,
+    );
+    expect(String(r.structuredContent?.text)).toContain("f_synthetic");
     expect(r.structuredContent).toMatchObject({
       courseId: course,
       links: [{ moduleId, externalurl: destination }],

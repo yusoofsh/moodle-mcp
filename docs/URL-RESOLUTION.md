@@ -1,4 +1,4 @@
-# Authenticated URL activity resolution (0.7.0)
+# Authenticated URL activity resolution (0.7.1)
 
 The former resource listing labelled `module.url` as external, but that field is
 normally a Moodle `/mod/url/view.php?id=...` activity wrapper. The actual stored
@@ -85,3 +85,12 @@ workerd suite passed 16 non-browser groups and 18 groups with Chromium/Firefox
 authorization tests. Bundle: 2146.34 KiB / 602.57 KiB gzip. Formatting, TypeScript,
 build and dependency audit passed (290 packages; no reported advisories at check
 time). Synthetic fixtures are not a substitute for post-deployment live checks.
+
+### Structured-only gateway compatibility (0.7.1)
+
+Live Composio validation confirmed all three requested Tutor activities resolve
+through the optional Moodle URL API. Composio exposes structuredContent in
+preference to text content when both exist. Resource structuredContent therefore
+also contains the full `text` listing (including opaque file IDs), alongside
+`courseId` and `links`. SDK and workerd checks require text parity. No private
+recording links or credentials are included in source fixtures.

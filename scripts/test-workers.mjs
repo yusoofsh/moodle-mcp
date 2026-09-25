@@ -418,6 +418,10 @@ try {
       });
       assert.equal(resources.status, 200, resources.text);
       assert.equal(resources.json.result.structuredContent.links.length, 1);
+      assert.equal(
+        resources.json.result.structuredContent.text,
+        resources.json.result.content[0].text,
+      );
       assert.match(
         resources.json.result.content[0].text,
         /externalurl: https:\/\/www.youtube.com/,

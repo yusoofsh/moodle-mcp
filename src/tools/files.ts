@@ -142,7 +142,8 @@ export function registerFileTools(
         const client = await getToolClient(source, "moodle_list_resources");
         const result = await listResources(client, courseId);
         return {
-          structuredContent: { courseId, links: result.links },
+          // Some gateways expose only structuredContent; retain the file IDs there too.
+          structuredContent: { courseId, ...result },
           content: [
             {
               type: "text" as const,
