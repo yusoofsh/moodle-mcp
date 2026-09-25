@@ -109,3 +109,19 @@ Regression tests cover complete PDF/character traversal using fileId-only calls,
 opaque payloads, tampering, account and token isolation, expiry, changed content,
 visibility loss, unsupported formats and exact MCP JSON parity. The authenticated
 workerd test also advances a character window through the public download tool.
+
+## Additional real-instance compatibility fixes
+
+Live notification retrieval failed with invalidparameter. Moodle 4.5 external API
+validation accepts boolean values as native booleans or 0/1; form-encoded strings
+"true"/"false" are not the same. The central REST serializer now encodes booleans
+as "1"/"0", with an authenticated transport regression test. This applies to all
+reviewed adapters, not just notifications. No permission failure is bypassed.
+
+Live grade output also exposed missing grademax fields as "undefined". Moodle's
+released grade report declares ranges and values optional, so the reader now
+returns explicit null ranges, does not assume 100, selects the exact student/course
+report, and withholds hidden-by-date/hidden values and feedback. Grades and popup
+notifications now use strict structured outputs; popup reads exclude other
+recipients and do not mark notifications read. Synthetic regressions distinguish
+these states from empty lists, completed submissions or zero grades.

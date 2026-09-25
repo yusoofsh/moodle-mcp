@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { MoodleClientSource } from "../moodle-source.js";
 import {
   canRegister,
@@ -5,127 +6,38 @@ import {
   READ_ONLY,
   AUTH_META,
 } from "../tool-policy.js";
-import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../moodle-client.js";
-
-interface GradeItem {
-  id: number;
-  itemname: string | null;
-  itemtype: string;
-  itemmodule?: string;
-  graderaw: number | null;
-  grademax: number;
-  gradeformatted: string;
-  percentageformatted: string | null;
-  feedback: string | null;
-  categoryid?: number | null;
-}
-
-interface GradeCategory {
-  id: number;
-  fullname: string;
-}
-
-interface GradeReport {
-  usergrades: {
-    courseid: number;
-    gradeitems: GradeItem[];
-    gradecategories?: GradeCategory[];
-  }[];
-}
-
+import { readGrades, releasedOutputs } from "../student/released-info.js";
+import { idSchema, pageShape, toolResult } from "../student/result.js";
 export async function getGrades(
   client: MoodleClient,
   courseId: number,
 ): Promise<string> {
-  if (!client.supports("gradereport_user_get_grade_items")) {
-    return "Grades API is not enabled on your Moodle. Ask your admin to enable the gradereport_user web service.";
-  }
-
-  const report = await client.call<GradeReport>(
-    "gradereport_user_get_grade_items",
-    {
-      courseid: courseId,
-      userid: client.userId,
-    },
-  );
-
-  const userGrades = report.usergrades[0];
-  if (!userGrades || userGrades.gradeitems.length === 0) {
-    return "No grade items found for this course.";
-  }
-
-  const categories = new Map(
-    (userGrades.gradecategories ?? []).map((c) => [c.id, c.fullname]),
-  );
-
-  const lines: string[] = [`## Grades — Course ${courseId}\n`];
-
-  // Group items by category
-  const byCat = new Map<string, GradeItem[]>();
-  for (const item of userGrades.gradeitems) {
-    if (item.itemtype === "course") continue; // Skip the course total row, add at end
-    const catName =
-      item.categoryid != null
-        ? (categories.get(item.categoryid) ?? "Uncategorized")
-        : "Uncategorized";
-    if (!byCat.has(catName)) byCat.set(catName, []);
-    byCat.get(catName)!.push(item);
-  }
-
-  for (const [catName, items] of byCat) {
-    lines.push(`### ${catName}`);
-    lines.push("| Item | Grade | Max | % | Feedback |");
-    lines.push("|------|-------|-----|---|----------|");
-    for (const item of items) {
-      const name = item.itemname ?? item.itemmodule ?? "—";
-      const grade = item.gradeformatted || "—";
-      const max = item.grademax > 0 ? String(item.grademax) : "—";
-      const pct = item.percentageformatted ?? "—";
-      const feedback =
-        (item.feedback ?? "").replace(/\n/g, " ").slice(0, 60) || "—";
-      lines.push(`| ${name} | ${grade} | ${max} | ${pct} | ${feedback} |`);
-    }
-    lines.push("");
-  }
-
-  // Course total
-  const courseTotalItem = userGrades.gradeitems.find(
-    (i) => i.itemtype === "course",
-  );
-  if (courseTotalItem) {
-    lines.push(
-      `**Course Total:** ${courseTotalItem.gradeformatted} / ${courseTotalItem.grademax} (${courseTotalItem.percentageformatted ?? "—"})`,
-    );
-  }
-
-  return lines.join("\n");
+  return (await readGrades(client, courseId)).text;
 }
-
 export function registerGradeTools(
   server: McpServer,
   source: MoodleClientSource,
 ): void {
-  if (canRegister(source, "moodle_get_grades"))
-    server.registerTool(
-      "moodle_get_grades",
-      {
-        description:
-          "Get your full grade report for a course — all graded items, categories, percentages, and feedback.",
-        inputSchema: z.object({
-          courseId: z.number().describe("Course ID from moodle_list_courses"),
-        }),
-        annotations: READ_ONLY,
-        _meta: AUTH_META,
-      },
-      async ({ courseId }) => {
-        const client = await getToolClient(source, "moodle_get_grades");
-        return {
-          content: [
-            { type: "text" as const, text: await getGrades(client, courseId) },
-          ],
-        };
-      },
-    );
+  if (!canRegister(source, "moodle_get_grades")) return;
+  server.registerTool(
+    "moodle_get_grades",
+    {
+      description:
+        "Read the current student’s released course grade report with explicit item/course IDs, category IDs, raw/displayed values and feedback. Missing maximum/range stays null, never undefined or assumed 100; hidden values are withheld. This is not a projected final grade. Optional local offset/limit pagination. Never changes grades or emits a view event.",
+      inputSchema: z.object({ courseId: idSchema, ...pageShape }).strict(),
+      outputSchema: releasedOutputs.moodle_get_grades,
+      annotations: READ_ONLY,
+      _meta: AUTH_META,
+    },
+    async ({ courseId, ...options }) =>
+      toolResult(
+        await readGrades(
+          await getToolClient(source, "moodle_get_grades"),
+          courseId,
+          options,
+        ),
+      ),
+  );
 }

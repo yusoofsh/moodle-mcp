@@ -140,7 +140,11 @@ export class MoodleClient {
       wsfunction,
       moodlewsrestformat: "json",
       ...Object.fromEntries(
-        Object.entries(params).map(([k, v]) => [k, String(v)]),
+        // Moodle PARAM_BOOL accepts bool/0/1, not form strings "true" or "false".
+        Object.entries(params).map(([k, v]) => [
+          k,
+          typeof v === "boolean" ? (v ? "1" : "0") : String(v),
+        ]),
       ),
     });
     const res = await fetchWithoutRedirect(url, {
