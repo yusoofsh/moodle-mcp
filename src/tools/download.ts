@@ -38,14 +38,19 @@ export function registerDownloadTool(
       },
       async ({ fileId, mode, ...options }) => {
         const client = await getToolClient(source, "moodle_download_file");
-        if (mode !== "raw")
-          return toolResult(await readDocument(client, fileId, options));
+        let extracted;
+        if (mode !== "raw") {
+          extracted = await readDocument(client, fileId, options);
+          if (extracted.data.document.status !== "unsupported")
+            return toolResult(extracted);
+        }
         const ref = await client.fileIdStore.open(fileId, client.userId);
         if (!ref || !(await reauthorize(client, ref)))
           throw new Error("File ID invalid, expired, or access denied.");
         const file = await client.downloadFile(ref.fileurl);
         const mime = file.mime || ref.mime;
         return {
+          ...(extracted ? { structuredContent: { ...extracted } } : {}),
           content: [
             {
               type: "text" as const,

@@ -257,13 +257,11 @@ export async function readQuizReview(
         options.maxCharsPerQuestion ?? 8000,
       ),
     }));
-  const feedback = (result.additionaldata ?? [])
-    .slice(0, 30)
-    .map((f) => ({
-      id: f.id,
-      title: f.title,
-      content: readableContent(f.content, 1, client.siteUrl, 8000),
-    }));
+  const feedback = (result.additionaldata ?? []).slice(0, 30).map((f) => ({
+    id: f.id,
+    title: f.title,
+    content: readableContent(f.content, 1, client.siteUrl, 8000),
+  }));
   const data = {
     ...blank,
     attemptId: selected.id,

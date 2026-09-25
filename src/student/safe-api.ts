@@ -1,3 +1,5 @@
+import { ACCOUNT_READS } from "./account-reads.js";
+import { ACTIVITY_READS } from "./activity-reads.js";
 import { z } from "zod";
 import type { MoodleClient } from "../moodle-client.js";
 import { loadSections } from "./course-data.js";
@@ -18,6 +20,7 @@ export interface ReadOperation {
   scope: "self" | "course" | "module";
   purpose: string;
   params: (client: MoodleClient, input: Args) => Params;
+  instanceType?: string;
   moduleType?: string;
   resultKey?: string;
 }
@@ -292,7 +295,7 @@ export const READ_OPERATIONS: Record<string, ReadOperation> = {
     params: (_c, a) => ({
       year: a.year as number,
       month: a.month as number,
-      courseid: value(a, "courseId", 0),
+      ...(typeof a.courseId === "number" ? { courseid: a.courseId } : {}),
     }),
   },
   core_calendar_get_calendar_day_view: {
@@ -310,7 +313,7 @@ export const READ_OPERATIONS: Record<string, ReadOperation> = {
       year: a.year as number,
       month: a.month as number,
       day: a.day as number,
-      courseid: value(a, "courseId", 0),
+      ...(typeof a.courseId === "number" ? { courseid: a.courseId } : {}),
     }),
   },
   core_calendar_get_calendar_upcoming_view: {
@@ -330,7 +333,7 @@ export const READ_OPERATIONS: Record<string, ReadOperation> = {
     input: course,
     scope: "course",
     purpose: "Competencies associated with a visible course",
-    params: courseParams,
+    params: (_c, a) => ({ id: a.courseId as number }),
   },
   tool_lp_data_for_course_competencies_page: {
     input: course,
@@ -389,6 +392,7 @@ for (const [moduleType, resultKey, functionName] of activityFamilies) {
     params: (_c, a) => ({ "courseids[0]": a.courseId as number }),
   };
 }
+Object.assign(READ_OPERATIONS, ACTIVITY_READS, ACCOUNT_READS);
 Object.freeze(READ_OPERATIONS);
 
 const secretKey =
@@ -508,6 +512,50 @@ export async function invokeReadOperation(
     modules = loaded.sections.flatMap((s) => s.modules);
     if (spec.scope === "module" && !modules.some((m) => m.id === args.moduleId))
       throw new Error("The selected module is not visible in this course.");
+  }
+  if (
+    functionName === "mod_chat_get_session_messages" &&
+    (Number(args.to) <= Number(args.from) ||
+      Number(args.to) - Number(args.from) > 7 * 86400 ||
+      Number(args.to) > Math.floor(Date.now() / 1000))
+  )
+    throw new Error(
+      "Historical chat range must be in the past and at most seven days.",
+    );
+  if (spec.instanceType) {
+    const found = modules.filter(
+      (m) => m.id === args.moduleId && m.modname === spec.instanceType,
+    );
+    if (found.length !== 1)
+      throw new Error(
+        "The selected activity type is not uniquely visible in this course.",
+      );
+    let instanceId = found[0].instance;
+    if (instanceId === undefined) {
+      const lookup = await readApi(
+        client,
+        "core_course_get_course_module",
+        { cmid: args.moduleId as number },
+        z.object({
+          cm: z.object({
+            id: idSchema,
+            course: idSchema,
+            modname: z.string(),
+            instance: idSchema,
+          }),
+        }),
+      );
+      const cm = lookup.value?.cm;
+      if (
+        !cm ||
+        cm.id !== args.moduleId ||
+        cm.course !== args.courseId ||
+        cm.modname !== spec.instanceType
+      )
+        throw new Error("Could not verify activity instance identity.");
+      instanceId = cm.instance;
+    }
+    args._resolvedInstanceId = instanceId;
   }
   const response = await readApi(
     client,

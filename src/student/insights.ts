@@ -244,10 +244,18 @@ export async function readTasks(
       (a.effectiveDueDate ?? Infinity) - (b.effectiveDueDate ?? Infinity) ||
       a.cmid - b.cmid,
   );
+  const windowEnd = now + (options.daysAhead ?? 30) * 86400;
+  const listedTasks = tasks.filter(
+    (task) =>
+      !["upcoming", "due_soon"].includes(task.state) ||
+      task.effectiveDueDate === null ||
+      task.effectiveDueDate <= windowEnd,
+  );
+  const outsideLookahead = tasks.length - listedTasks.length;
   const counts = Object.fromEntries(
     Object.keys(order).map((key) => [
       key,
-      tasks.filter((t) => t.state === key).length,
+      listedTasks.filter((t) => t.state === key).length,
     ]),
   );
   const complete =
@@ -261,8 +269,14 @@ export async function readTasks(
     userId: client.userId,
     asOf: now,
     asOfIso: iso(now),
-    items: tasks,
+    items: listedTasks,
     counts,
+    lookahead: {
+      daysAhead: options.daysAhead ?? 30,
+      until: windowEnd,
+      untilIso: iso(windowEnd),
+      outsideLookaheadInCheckedPage: outsideLookahead,
+    },
     complete,
     coverage: {
       courseOffset: options.courseOffset ?? 0,
@@ -282,7 +296,7 @@ export async function readTasks(
   return packet(
     data,
     "## Submission-aware tasks\n" +
-      tasks
+      listedTasks
         .map(
           (t) =>
             `- ${t.name}: ${t.state}; effective deadline ${t.effectiveDueDateIso ?? "unknown/none"}`,

@@ -5,8 +5,6 @@ import {
   getToolClient,
   READ_ONLY,
   AUTH_META,
-  TOOL_FUNCTIONS,
-  TOOL_OPTIONAL_FUNCTIONS,
 } from "../tool-policy.js";
 import { toolResult } from "../student/result.js";
 import {
@@ -14,11 +12,6 @@ import {
   quizReviewInput,
   quizReviewOutput,
 } from "../student/quiz-review.js";
-TOOL_FUNCTIONS.moodle_get_quiz_review = ["core_course_get_contents"];
-TOOL_OPTIONAL_FUNCTIONS.moodle_get_quiz_review = [
-  "mod_quiz_get_user_attempts",
-  "mod_quiz_get_attempt_review",
-];
 export function registerQuizReviewTools(
   server: McpServer,
   source: MoodleClientSource,

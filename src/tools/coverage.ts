@@ -6,8 +6,6 @@ import {
   getToolClient,
   READ_ONLY,
   AUTH_META,
-  TOOL_FUNCTIONS,
-  TOOL_OPTIONAL_FUNCTIONS,
 } from "../tool-policy.js";
 import { readOutputSchema, toolResult } from "../student/result.js";
 import { READ_OPERATIONS, invokeReadOperation } from "../student/safe-api.js";
@@ -25,39 +23,6 @@ import {
   readAssignmentDetails,
 } from "../student/insights.js";
 
-export const COVERAGE_REQUIREMENTS: Record<string, readonly string[]> = {
-  moodle_read_api: [],
-  moodle_get_api_coverage: [],
-  moodle_get_tasks: ["core_course_get_contents"],
-  moodle_search_materials: ["core_course_get_contents"],
-  moodle_get_briefing: ["core_course_get_contents"],
-  moodle_get_recent_activity: ["core_course_get_contents"],
-  moodle_get_assignment_details: ["core_course_get_contents"],
-  moodle_get_grades_overview: [],
-};
-Object.assign(TOOL_FUNCTIONS, COVERAGE_REQUIREMENTS);
-Object.assign(TOOL_OPTIONAL_FUNCTIONS, {
-  moodle_read_api: Object.keys(READ_OPERATIONS),
-  moodle_get_tasks: [
-    "core_enrol_get_users_courses",
-    "mod_assign_get_assignments",
-    "mod_assign_get_submission_status",
-  ],
-  moodle_search_materials: ["core_enrol_get_users_courses"],
-  moodle_get_briefing: [
-    "core_enrol_get_users_courses",
-    "mod_assign_get_assignments",
-    "mod_assign_get_submission_status",
-    "core_calendar_get_action_events_by_timesort",
-    "gradereport_overview_get_course_grades",
-  ],
-  moodle_get_recent_activity: [
-    "core_enrol_get_users_courses",
-    "core_course_get_updates_since",
-  ],
-  moodle_get_assignment_details: ["mod_assign_get_assignments"],
-  moodle_get_grades_overview: ["gradereport_overview_get_course_grades"],
-});
 export function registerCoverageTools(
   server: McpServer,
   source: MoodleClientSource,
