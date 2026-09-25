@@ -1,238 +1,227 @@
-# Moodle MCP — OAuth + OCI fork
+# Moodle MCP — student reads, document text and API coverage
 
-## Cloudflare Workers Free — 0.5.0
+Version **0.10.0** provides **31 high-level read-only MCP tools**, a restricted
+registry of reviewed Moodle Web Service adapters, and authenticated remote access
+on Cloudflare Workers or a Node/OCI server. This MIT-licensed fork of
+[1alexandrer/moodle-mcp](https://github.com/1alexandrer/moodle-mcp) targets a single
+student account without requiring a Moodle administrator or an installed plugin.
 
-The password/OAuth application can now run in a SQLite-backed Durable Object without Docker or a VPS. See [the Workers deployment and migration guide](docs/CLOUDFLARE.md). All 21 read-only Moodle tools remain, subject to Moodle permissions and Worker-specific limits. Generate a compatible hash with `bun run password:hash --workers`. Container support below is retained.
+**Scope is explicit:** an advertised API is not proof of permission or implemented
+workflow coverage. Writes, activity views with side effects, attendance marking,
+active quiz operations and unreviewed functions are not exposed by the read API.
+See [SiberMu coverage and validation](docs/SIBERMU-COVERAGE.md).
 
-Read-only access to your Moodle account from ChatGPT or another MCP client, without installing a Moodle plugin. This MIT-licensed fork of [1alexandrer/moodle-mcp](https://github.com/1alexandrer/moodle-mcp) adds a container-hosted OAuth authorization server and hardens remote access.
+## Main capabilities
 
-**Current scope:** single Moodle account, one password-authenticated owner (or an explicitly selected GitHub owner), 21 student-facing tools. This is an OAuth/OCI foundation release, not complete Moodle API coverage. [Triage and follow-up work](docs/TRIAGE.md) · [Review record](docs/REVIEW.md) · [Security model](SECURITY.md).
+- Course and assignment reading with distinct course-module/instance IDs, released
+  feedback, individual extensions, team submission status and explicit unknowns.
+- Page/Book/Folder/File/Text-media readers, external URL resolution, forum threads,
+  action timelines, activity/course completion and conditional Attendance reads.
+- PDF, DOCX and PPTX text extraction through authorized file IDs. The existing
+  `moodle_download_file` action defaults to structured text instead of relying on
+  a gateway to forward embedded binary data. Raw mode remains available.
+- Submission-aware task prioritization, material metadata search, daily/weekly
+  briefings, workload groups, recent course updates and cross-course grade overview.
+- Finished own-quiz review, preserving Moodle's review/grade-release restrictions.
+- A finite read-API registry for account, messaging, groups, participants, badges,
+  calendar, competencies, learning plans and standard activity metadata/content.
+
+The backend catalog includes these added tools:
+
+```text
+moodle_read_document          moodle_get_tasks
+moodle_search_materials       moodle_get_briefing
+moodle_get_recent_activity    moodle_get_assignment_details
+moodle_get_grades_overview    moodle_get_quiz_review
+moodle_get_api_coverage       moodle_read_api
+```
+
+`manifest.json` contains the complete 31-tool inventory. Existing course, forum,
+resource, completion and dashboard tools remain available. Five prompt templates
+are also retained; prompts are not additional implemented API operations.
 
 ## Architecture
 
 ```text
-ChatGPT ── OAuth authorization code + PKCE ──► Moodle MCP /mcp
-                         │                         │
-                 Local password login          Moodle WS token
-                 + explicit consent          (server-side only)
-                                                   │
-                                                   ▼
-                                              Your Moodle
+ChatGPT / MCP client
+       |
+       | HTTPS, OAuth authorization code + PKCE
+       v
+Password login + explicit owner consent
+       |
+       v
+MCP tools + encrypted persistent OAuth/Moodle connection state
+       |
+       | Moodle HTTPS Web Services, using the student's credential
+       v
+University Moodle
 ```
 
-The container uses Node.js 24, the official MCP TypeScript SDK v2 and the maintained `oidc-provider` authorization server. Bun manages dependencies and development scripts. Authorization data and signing keys persist in an encrypted SQLite database. OAuth tokens issued to MCP clients are distinct from your Moodle token.
+Cloudflare uses a routing Worker and one SQLite-backed Durable Object. Node/OCI
+uses Node.js 24 and local SQLite. Both retain the official MCP TypeScript SDK v2
+and oidc-provider. Bun 1.4.2 manages dependencies and development commands.
+The MCP access/refresh credentials are separate from the university Moodle token.
 
-## Deploy the OCI image
+## Cloudflare Workers deployment
 
-Published image name: `ghcr.io/yusoofsh/moodle-mcp`. The publication workflow creates `latest` and `sha-<full-commit-SHA>` tags for `linux/amd64` and `linux/arm64`, plus SBOM and provenance attestations. Use the digest recorded in the successful Actions run for an immutable deployment. Publishing an image does not start a hosted MCP service.
+The supplied configuration uses `moodle.yusoofsh.workers.dev`; set `PUBLIC_URL` to
+the exact HTTPS origin for a different account or domain. Preserve existing
+Durable Object bindings, migration history and `AUTH_SECRET` during upgrades.
 
 ```bash
 git clone https://github.com/yusoofsh/moodle-mcp.git
 cd moodle-mcp
+bun install --frozen-lockfile --ignore-scripts
+bun run build
+bun run password:hash --workers
+openssl rand -hex 32
+bunx --no-install wrangler login
+bun run workers:deploy
+```
+
+Add Worker runtime secrets using Cloudflare's dashboard or Wrangler:
+
+```bash
+bunx --no-install wrangler secret put AUTH_PASSWORD_HASH
+bunx --no-install wrangler secret put AUTH_SECRET
+bunx --no-install wrangler secret put MOODLE_URL
+```
+
+Use the generated hash value, not the plaintext passphrase, for
+`AUTH_PASSWORD_HASH`. `AUTH_SECRET` is the separate 64-hex-character encryption
+secret. `MOODLE_URL` is the university installation base URL, including any
+subdirectory. The Workers password profile needs the `--workers` option; the
+container's default scrypt profile has a larger memory requirement.
+
+`MOODLE_TOKEN` is an **optional fallback**, not a requirement after an owner-approved
+connection is stored. To configure that fallback explicitly:
+
+```bash
+bunx --no-install wrangler secret put MOODLE_TOKEN
+```
+
+For Google-SSO institutions, use the owner's `/connect/moodle` page and the
+university's permitted mobile login. Browser protocol handoff depends on the
+institution and browser. The explicit **Import copied Moodle link** flow accepts
+an authorized mobile return with fresh owner-password verification and account
+confirmation. Neither route asks for the Google password on this server.
+
+- [SSO setup and limitations](docs/SSO-ONBOARDING.md)
+- [Owner-approved copied-link import](docs/COPIED-LINK-IMPORT.md)
+- [Workers deployment background](docs/CLOUDFLARE.md)
+
+Historical version/count examples in older validation documents describe their
+respective release, not the current tool inventory.
+
+## OCI and local stdio
+
+GitHub Actions publishes `ghcr.io/yusoofsh/moodle-mcp:latest` and
+`sha-<full-commit-SHA>` for amd64/arm64 after tests pass. Use the immutable digest
+from the successful publication run when pinning a deployment. Publishing does
+not itself start a hosted service.
+
+```bash
 cp .env.example .env
 chmod 600 .env
-openssl rand -hex 32
-```
-
-Set the generated value as `AUTH_SECRET` in `.env`, then fill the remaining values. Do not commit `.env`.
-
-### Generate your owner password hash
-
-Use the image's hidden-prompt helper. This does not need Moodle credentials, an OAuth App, or a running server:
-
-```bash
-docker pull ghcr.io/yusoofsh/moodle-mcp:latest
-docker run --rm -it ghcr.io/yusoofsh/moodle-mcp:latest node dist/auth/password-cli.js
-```
-
-Enter a unique passphrase of **at least 15 characters**, then confirm it. The helper does not echo the password. Copy its `AUTH_PASSWORD_HASH=...` output into `.env`; keep `AUTH_MODE=password`. There is no username, signup or GitHub OAuth App to configure. The password is for this bridge, **not** your Moodle password.
-
-The hash uses a random salt and Node's built-in scrypt (`N=131072`, `r=8`, `p=1`). The encoded value uses colons, so it does not need dollar-sign escaping in Compose. Passwords preserve spaces and Unicode and are capped at 1024 UTF-8 bytes. The helper also supports `--stdin` for secret-manager pipelines; never pass a password as a command-line argument or put it in shell history.
-
-For a source checkout, first run `bun run build`, then `bun run password:hash`.
-
-| Variable                 | Configuration                                                                                                   |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `PUBLIC_URL`             | Your externally reachable HTTPS **origin**, e.g. `https://moodle-mcp.example.com`, without `/mcp`               |
-| `AUTH_MODE`              | `password` (default); `github` is an explicit alternative                                                       |
-| `AUTH_PASSWORD_HASH`     | The generated scrypt hash from the password helper; required in password mode                                   |
-| `AUTH_SECRET`            | 32 cryptographically random bytes, represented as 64 hexadecimal characters                                     |
-| `MOODLE_URL`             | Moodle base URL; include its installation subdirectory when applicable                                          |
-| `MOODLE_TOKEN`           | Your own permitted Moodle mobile/web-service token                                                              |
-| `TRUST_PROXY_HOPS`       | `1` for the supplied loopback-bound service behind one reverse proxy; do not expose that upstream port publicly |
-| `OAUTH_DATABASE_PATH`    | `/data/oauth.sqlite`; retain the named volume and the same `AUTH_SECRET` across upgrades                        |
-| `MOODLE_MCP_MAX_FILE_MB` | Per-file download cap; example configuration uses 10 MB                                                         |
-
-### Optional GitHub mode and upgrades from 0.3.0
-
-**Existing GitHub deployments must add `AUTH_MODE=github` before upgrading**, or startup will fail closed requesting `AUTH_PASSWORD_HASH`. Password mode does not use any GitHub settings. To keep GitHub mode, set `AUTH_MODE=github`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` and the numeric `GITHUB_ALLOWED_USER_ID`. Create the GitHub OAuth App with its **authorization callback URL** set to:
-
-```text
-https://moodle-mcp.example.com/interaction/github/callback
-```
-
-That is the **GitHub login callback**, not ChatGPT's OAuth redirect URI. Replace the domain with `PUBLIC_URL`.
-
-```bash
+# Configure the owner password hash, encryption secret, origin and Moodle URL.
 docker compose pull
 docker compose up -d
-docker compose logs --tail=50
 ```
 
-A new GHCR package may be private. Authenticate to GHCR with an appropriately scoped credential when required; never place registry credentials in `.env` or the image.
-
-Configure your reverse proxy to forward the HTTPS origin to `127.0.0.1:3000`, preserve the Host header, and set trusted forwarding headers. The supplied Compose file binds only to loopback, runs as UID 1000, drops capabilities, uses a read-only root filesystem and persists `/data`. Keep one application replica; this SQLite deployment is not a multi-node authorization service.
-
-## Connect ChatGPT
-
-Add your public remote MCP endpoint with **OAuth authentication**:
-
-```text
-https://moodle-mcp.example.com/mcp
-```
-
-The client discovers the authorization server and dynamically registers itself. Enter your local owner password on **your server's login page**, then inspect and approve the separate consent screen. ChatGPT receives OAuth access/refresh tokens, not the password. In optional GitHub mode, sign in as the allowlisted GitHub owner instead. The server supports DCR; CIMD is not implemented. Whether a particular ChatGPT interface exposes custom MCP configuration depends on the account/workspace configuration.
-
-The discovery chain is:
-
-```text
-/mcp → 401 + WWW-Authenticate resource_metadata
-/.well-known/oauth-protected-resource/mcp
-/.well-known/oauth-authorization-server
-/oauth/authorize
-/oauth/token
-/oauth/register
-```
-
-Client registrations, grants, refresh tokens and signing keys survive process restarts when the volume and `AUTH_SECRET` remain intact. Access tokens expire after 15 minutes. Refresh tokens rotate; replay revokes the related grant's credentials. `/oauth/revoke` implements token revocation. The consent flow is restricted to the configured owner.
-
-### Password rotation and login throttling
-
-Generate a new hash with the same helper, replace `AUTH_PASSWORD_HASH`, and recreate the container:
+For the container profile, generate the hidden-input hash with:
 
 ```bash
-docker compose up -d --force-recreate
+docker run --rm -it ghcr.io/yusoofsh/moodle-mcp:latest \
+  node dist/auth/password-cli.js
 ```
 
-Keep `AUTH_SECRET` and the OAuth data volume unchanged. Ordinary restarts preserve sessions. Changing the password hash (even regenerating it for the same password) changes the internal owner identity: old browser sessions must sign in again, old access tokens are rejected, and old refresh tokens cannot renew access. Reconnect your MCP client. Switching between GitHub and password mode also requires reauthorization. No database deletion is necessary.
+The supplied Compose service binds its HTTP port to loopback. Place a trusted
+HTTPS reverse proxy in front of it, configure `TRUST_PROXY_HOPS` for that topology,
+and retain its data volume. Keep one application replica for the local SQLite
+mode. Optional GitHub owner login remains a container-only configuration; the
+Workers deployment uses password login.
 
-Password attempts are limited to **5 per IP per 15 minutes** and **30 total per 15 minutes**, stored in SQLite across restarts. Successful attempts also count. Only one expensive password verification runs at a time (approximately 128 MiB scrypt memory); rejected requests receive HTTP 429 and a `Retry-After` header. These budgets can temporarily block the owner during an attack; retain edge rate limits and correct proxy configuration. They are not a multi-replica or DDoS defense.
+A local stdio client can run `node dist/server.js` with its Moodle configuration
+in the process environment. OAuth protects the remote HTTP boundary, not stdio.
+Never commit `.env`, copy credentials into tool arguments, or embed them in images.
 
-## Available tools
+## Connect the remote MCP client
 
-Authenticated HTTP/Workers discovery returns a stable catalog of 21 read-only tools without contacting Moodle. The connection and required web-service capabilities are checked when each tool runs, so a university outage or invalid Moodle token cannot hide the tool list. `moodle_get_site_info` reports availability for the configured token. Already-connected stdio clients still filter the list by reported capabilities. Advertising a tool never grants Moodle permissions.
+Use the public endpoint with OAuth and dynamic client registration:
 
-| Tool                                                 | Function                                                        |
-| ---------------------------------------------------- | --------------------------------------------------------------- |
-| `moodle_get_site_info`                               | Account/site information and advertised Moodle API availability |
-| `moodle_list_courses`, `moodle_get_course`           | Enrolled courses, sections and activities                       |
-| `moodle_list_resources`, `moodle_download_file`      | Resource listing and authenticated, bounded file downloads      |
-| `moodle_list_assignments`, `moodle_get_assignment`   | Assignments, deadlines and submission/grade status              |
-| `moodle_get_grades`                                  | Per-course grade report                                         |
-| `moodle_get_calendar_events`                         | Upcoming calendar events                                        |
-| `moodle_list_quizzes`, `moodle_get_quiz_attempts`    | Quizzes and the user's prior attempts                           |
-| `moodle_list_forums`, `moodle_get_forum_discussions` | Forums and recent discussions                                   |
-| `moodle_get_notifications`                           | Recent notifications                                            |
+```text
+https://moodle.yusoofsh.workers.dev/mcp
+```
 
-Five prompts and opaque file resources are retained. Prompts and binary embedded resources depend on client support. PDF/DOCX bytes are not automatically converted into extracted, searchable text; base64 can exceed client context limits well before the server's download cap. File IDs expire and both the tool and resource paths recheck current Moodle visibility.
+Enter the existing owner passphrase on the server's own page and approve consent.
+The implementation includes DCR, PKCE S256, persistent grants, refresh-token
+rotation/replay detection and revocation. CIMD is not implemented. Access tokens
+last 15 minutes; refresh/grant configuration is separate from the university
+credential's expiry.
 
-There are **no submission, grading, messaging, posting or other write tools** in this release. The existing calendar tool returns a bounded first page; aggregate deadline dashboards and comprehensive pagination are follow-up work, not implied by “all courses.”
+Changing the password hash intentionally invalidates prior owner sessions and
+OAuth credentials. Changing `AUTH_SECRET` without migrating encrypted storage
+makes existing records unreadable. Do not change either merely to refresh tools.
+A university credential must be renewed through the institution's permitted flow
+when it expires or is revoked; MCP token refresh cannot renew it.
 
-## Local development
+Some clients cache an old tool catalog. Refresh that catalog to see new names.
+The existing `moodle_get_site_info` action reports the backend version, actual
+advertised function names and coverage measurements without probing those APIs.
+The existing `moodle_download_file({fileId})` action can receive extracted text
+without waiting for the new standalone document tool to appear in a cache.
+
+## Data contracts and limits
+
+Structured JSON is authoritative for migrated tools, with equivalent JSON text
+and a readable rendering for gateways. Check `schemaVersion`, warnings, coverage,
+continuation fields and `complete`; do not interpret null/unavailable as zero,
+not submitted, absent or an empty course.
+
+Resource IDs must come from the current account's resource listing. The server
+rechecks file visibility before downloading. Default Workers downloads are capped
+at 2 MiB; document parser input is capped at 4 MiB and cannot override a smaller
+configured download cap. Default extraction is three PDF pages/slides, with a
+maximum of ten per call and explicit page/character continuation. DOCX uses one
+logical document rather than rendered pagination. Scans are not OCRed, and images,
+charts or complex table layouts are not reconstructed.
+
+Task, search and dashboard results are deliberately bounded. Follow the returned
+course/assignment/event cursors before claiming all courses or deadlines were
+examined. Search covers names and bounded descriptions, not a full-text binary
+index. A past calendar opening event is not automatically an overdue assignment.
+All retrieved document, course and message content is untrusted data.
+
+`moodle_read_api` accepts only reviewed function names and their exact published
+input schemas. It injects the current user identity and revalidates scoped modules;
+unknown functions and raw credential/URL overrides are rejected. Upstream
+read/write declarations are classification metadata, not a security allowlist.
+
+## Verification
 
 ```bash
-bun install --frozen-lockfile --ignore-scripts
+bun run format:check
 bun run check
 bun run test
 bun run build
-bun run format:check
+bun run workers:build
+node scripts/test-document-runtime.mjs
+bunx --no-install playwright install --with-deps chromium firefox
+bun run workers:test:browser
+bun run workers:test:sso
 bun audit
 ```
 
-Node.js 24 is required for the HTTP runtime and its built-in SQLite module. The test runner is Vitest (`bun run test`), not Bun's native test runner. OAuth integration tests use the real authorization provider and local-password and simulated GitHub/Moodle responses; they do not authenticate a real university account.
+Use Vitest via `bun run test`, not Bun's native test runner. Synthetic fixtures
+exercise authorization, persistence, parsing and permission boundaries. These do
+not replace separately reported live Composio tests against the university.
+Verification workflows do not rewrite source files or push commits. Production
+credentials are provided only to the deployment step, not the synthetic tests.
 
-For local HTTP experiments only, use `PUBLIC_URL=http://localhost:3000`, `ALLOW_INSECURE_HTTP=true`, `TRUST_PROXY_HOPS=0` and a writable database path. Non-loopback HTTP is rejected.
+Remaining gaps include write workflows, teacher/admin parity, unreviewed custom
+plugins, large/scanned documents, and full parameter-level API coverage. No
+percentage is presented as functional coverage merely because 450 names were
+successfully inventoried.
 
-For an on-machine stdio MCP client, use `node dist/server.js` with Moodle credentials in its environment. OAuth protects the remote HTTP boundary, not local stdio. The Cloudflare Worker now uses password OAuth and persistent Durable Object SQLite; see docs/CLOUDFLARE.md. MCP_ACCESS_TOKEN no longer applies.
-
-## Verification and references
-
-CI checks formatting, TypeScript, the test suite, dependency advisories, a native container build, unauthenticated HTTP behavior and non-root execution **before** the publish job. The publish job pushes amd64/arm64 OCI images and records their manifest digest.
-
-- [OpenAI MCP authentication](https://developers.openai.com/plugins/build/auth)
-- [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- [oidc-provider](https://github.com/panva/node-oidc-provider)
-- [GitHub OAuth web application flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps)
-
-The original MIT license and attribution are retained. No code from differently or ambiguously licensed Moodle MCP projects has been copied into this fork.
-
-## University Google SSO (student onboarding)
-
-In password/Workers mode, open `/connect/moodle` to connect through your
-university’s existing Moodle mobile SSO. Use desktop Firefox or Chrome, allow
-the browser return handler, sign in at the university, and explicitly confirm
-the returned Moodle account. No new Google OAuth app is required.
-`MOODLE_TOKEN` remains an optional fallback; a confirmed SSO credential is stored
-encrypted. See [setup, security boundaries, and browser limitations](docs/SSO-ONBOARDING.md).
-The institution’s final custom-scheme handoff requires a live user acceptance test.
-
-For an app link that did not return automatically, use **Import copied Moodle link** on the owner setup page. See [the owner-approved import guide](docs/COPIED-LINK-IMPORT.md). No Google password or manual Cloudflare secret edit is needed.
-
-## URL activities and recording links (0.7.0)
-
-`moodle_list_resources({courseId})` now includes each visible URL activity's
-`moduleId`, actual `externalurl`, and separate Moodle `activityUrl`. It returns
-these in text and `structuredContent.links`, so text-only connectors can read them.
-`moodle_resolve_url({moduleId, courseId?})` resolves one activity and returns an
-equivalent JSON text/structured result. For a course known to the client, supplying
-`courseId` avoids an extra module lookup. See [URL resolution](docs/URL-RESOLUTION.md).
-
-This returns the destination configured by the teacher; it does not fetch that
-site, follow redirects, transcribe videos, or send Moodle credentials downstream.
-Use only `resolved: true` targets for a separate permitted transcription workflow.
-
-## Student read correctness and progress (0.8.0)
-
-Assignments now join Moodle 4.5 `cmid` correctly, keep the requested course scoped,
-and expose distinct assignment IDs, UTC due dates, individual extension/status
-and released grade feedback. Missing results are not interpreted as no deadline,
-not submitted, ungraded, or absent.
-
-New read-only tools:
-
-| Tool                             | Purpose                                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `moodle_get_activity_completion` | Current student activity completion, rules and a visible-activity progress summary                |
-| `moodle_get_course_completion`   | Moodle's separate course-completion decision and criteria                                         |
-| `moodle_get_attendance`          | Visible Attendance inventory; optionally attempt permitted self-only session reads for one module |
-
-Eight student-read tools now provide declared per-tool JSON output schemas, a
-versioned result envelope, warnings and readable text. Lists support bounded local
-`offset`/`limit` pagination. Site info reports a versioned backend catalog and the
-actual advertised Attendance API names; this does not overwrite a connector's
-cached tool registry or claim role/context permission.
-
-**Attendance is not auto-marked.** The plugin's mobile view handler can record
-presence merely when viewed, so that handler is intentionally never used. An
-unavailable or staff-only sessions API is reported, not bypassed. See
-[Student read P0 scope and validation](docs/STUDENT-READ-P0.md).
-
-## Native content and student dashboard (0.9.0)
-
-| Tool                      | Purpose                                                                                                          |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `moodle_get_resource`     | Read a visible Page, Book chapter, Text/media label, Folder or File resource, using its course-module `moduleId` |
-| `moodle_get_forum_thread` | Read permitted discussion posts/replies with parent IDs, without marking read                                    |
-| `moodle_get_dashboard`    | A bounded course-progress page and a separately paginated current-user action timeline                           |
-
-The existing forum list now returns the correct `forumId` (instance ID), separately
-from `cmid`. Discussion listing includes the actual `discussionId` and readable
-first-post body using the Moodle 4.5 sort contract. Calendar course filtering now
-uses the course-specific API before pagination, rather than filtering a limited
-global page. Existing resource listing exposes Page/Book/label activities and keeps
-its text/file IDs available through structured-only gateways.
-
-HTML exports are reduced to bounded plain text plus safe links. Scripts and remote
-resources are never executed/fetched by the text parser, and no activity view or
-mark-read endpoint is invoked. PDF/DOCX extraction and forum attachment downloads
-remain separate unfinished work. See [content contracts and limits](docs/STUDENT-CONTENT.md).
+The original MIT license and attribution are retained. Reference-project ideas
+were evaluated without copying differently licensed implementation code.
