@@ -1,3 +1,4 @@
+import { registerContentTools } from "./tools/content.js";
 import { registerStudentTools } from "./tools/student.js";
 import { registerUrlTools } from "./tools/urls.js";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -28,5 +29,6 @@ export function registerAllTools(
   registerForumTools(server, client);
   registerNotificationTools(server, client);
   registerStudentTools(server, client);
+  registerContentTools(server, client);
   registerSiteInfoTool(server, client);
 }

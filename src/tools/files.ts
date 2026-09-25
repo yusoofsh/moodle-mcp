@@ -1,3 +1,5 @@
+import { readableContent } from "../student/content-text.js";
+import { managedFileUrl } from "../student/resources.js";
 import {
   resolveCourseUrls,
   isUserVisible,
@@ -17,6 +19,7 @@ import type { MoodleClient } from "../moodle-client.js";
 interface ModuleContent {
   type: string;
   filename: string;
+  filepath?: string;
   fileurl: string;
   filesize: number;
   mimetype?: string;
@@ -30,6 +33,7 @@ interface CourseModule {
   instance?: number;
   uservisible?: boolean | number;
   contents?: ModuleContent[];
+  description?: string;
 }
 
 interface CourseSection {
@@ -39,7 +43,14 @@ interface CourseSection {
   modules: CourseModule[];
 }
 
-const FILE_MODS = new Set(["resource", "url", "folder"]);
+const FILE_MODS = new Set([
+  "resource",
+  "url",
+  "folder",
+  "page",
+  "book",
+  "label",
+]);
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -50,7 +61,16 @@ function formatSize(bytes: number): string {
 export async function listResources(
   client: MoodleClient,
   courseId: number,
-): Promise<{ text: string; links: ResolvedUrl[] }> {
+): Promise<{
+  text: string;
+  links: ResolvedUrl[];
+  activities: {
+    moduleId: number;
+    moduleType: string;
+    name: string;
+    description: ReturnType<typeof readableContent> | null;
+  }[];
+}> {
   const sections = await client.call<CourseSection[]>(
     "core_course_get_contents",
     {
@@ -61,6 +81,12 @@ export async function listResources(
   const urls = await resolveCourseUrls(client, courseId, sections);
   const lines: string[] = [`## Files — Course ${courseId}\n`];
   let hasFiles = false;
+  const activities: {
+    moduleId: number;
+    moduleType: string;
+    name: string;
+    description: ReturnType<typeof readableContent> | null;
+  }[] = [];
 
   for (const section of sections.filter(isUserVisible)) {
     const fileMods = section.modules.filter(
@@ -72,6 +98,23 @@ export async function listResources(
     hasFiles = true;
 
     for (const mod of fileMods) {
+      const description =
+        mod.description === undefined
+          ? null
+          : readableContent(mod.description, 1, client.siteUrl, 4000);
+      activities.push({
+        moduleId: mod.id,
+        moduleType: mod.modname,
+        name: mod.name,
+        description,
+      });
+      if (["page", "book", "label"].includes(mod.modname)) {
+        lines.push(
+          `- **${mod.name}** (${mod.modname}) — moduleId: \`${mod.id}\`; read with moodle_get_resource`,
+        );
+        if (description) lines.push(description.text);
+        continue;
+      }
       if (mod.modname === "url") {
         const link = urls.get(mod.id)!;
         // Render the real target in plain text too: gateways may omit structuredContent.
@@ -90,7 +133,11 @@ export async function listResources(
         continue;
       }
       for (const file of mod.contents) {
-        if (file.type !== "file") continue;
+        if (
+          file.type !== "file" ||
+          !managedFileUrl(file.fileurl, client.siteUrl)
+        )
+          continue;
         const mime = file.mimetype ?? "application/octet-stream";
         const fileId = await client.fileIdStore.seal({
           userId: client.userId,
@@ -110,11 +157,15 @@ export async function listResources(
   }
 
   if (!hasFiles)
-    return { text: "No downloadable files found in this course.", links: [] };
+    return {
+      text: "No visible supported resources returned in this course.",
+      links: [],
+      activities,
+    };
   lines.push(
     "_Call `moodle_download_file` with a fileId above to read the file's contents._",
   );
-  return { text: lines.join("\n"), links: [...urls.values()] };
+  return { text: lines.join("\n"), links: [...urls.values()], activities };
 }
 
 export function registerFileTools(

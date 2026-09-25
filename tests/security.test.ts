@@ -93,3 +93,15 @@ describe("security regressions", () => {
     expect(await a.open(id, 7)).not.toBeNull();
   });
 });
+
+it("honors a lower per-call download limit before reading a declared large file", async () => {
+  const c = await client();
+  vi.mocked(fetch).mockResolvedValueOnce(
+    new Response("123456789", {
+      headers: { "Content-Length": "9", "Content-Type": "text/html" },
+    }),
+  );
+  await expect(
+    c.downloadFile("https://school.example/moodle/pluginfile.php/a.html", 4),
+  ).rejects.toThrow(/large/);
+});

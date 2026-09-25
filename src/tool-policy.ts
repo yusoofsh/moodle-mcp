@@ -22,7 +22,7 @@ export const TOOL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_list_assignments: ["core_course_get_contents"],
   moodle_get_assignment: ["mod_assign_get_submission_status"],
   moodle_get_grades: ["gradereport_user_get_grade_items"],
-  moodle_get_calendar_events: ["core_calendar_get_action_events_by_timesort"],
+  moodle_get_calendar_events: [],
   moodle_list_quizzes: [
     "core_course_get_contents",
     "mod_quiz_get_quizzes_by_courses",
@@ -32,11 +32,29 @@ export const TOOL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_get_forum_discussions: ["mod_forum_get_forum_discussions"],
   moodle_get_activity_completion: ["core_course_get_contents"],
   moodle_get_course_completion: ["core_course_get_contents"],
+  moodle_get_resource: ["core_course_get_contents"],
+  moodle_get_forum_thread: ["core_course_get_contents"],
+  moodle_get_dashboard: ["core_enrol_get_users_courses"],
   moodle_get_attendance: ["core_course_get_contents"],
   moodle_get_notifications: ["message_popup_get_popup_notifications"],
 };
-export const TOOL_CATALOG_VERSION = "0.8.1";
+export const TOOL_CATALOG_VERSION = "0.9.0";
 export const TOOL_OPTIONAL_FUNCTIONS: Record<string, readonly string[]> = {
+  moodle_get_resource: ["core_course_get_course_module"],
+  moodle_get_forum_thread: [
+    "mod_forum_get_discussion_posts",
+    "mod_forum_get_forums_by_courses",
+  ],
+  moodle_list_forums: ["mod_forum_get_forums_by_courses"],
+  moodle_get_calendar_events: [
+    "core_calendar_get_action_events_by_timesort",
+    "core_calendar_get_action_events_by_course",
+  ],
+  moodle_get_dashboard: [
+    "core_course_get_contents",
+    "core_calendar_get_action_events_by_timesort",
+  ],
+
   moodle_list_assignments: ["mod_assign_get_assignments"],
   moodle_get_activity_completion: [
     "core_completion_get_activities_completion_status",

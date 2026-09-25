@@ -85,3 +85,16 @@ legacy outputs, and client-side registry refresh. Student write flows, teacher
 and admin operations remain separate, unimplemented scope. Attendance student
 read parity depends on the installed plugin's authorized API; no automatic
 mobile view fallback is allowed because it can change attendance.
+
+## 0.9.0 — native content and dashboard increment
+
+Implemented first-class Page/Book/Folder/File/Text-media reads, full permitted forum
+thread text, bounded dashboard/action timeline, and structured schemas for these
+new tools plus the existing forum/calendar tools. Fixed forum instance/cmid and
+discussion/first-post IDs and Moodle's integer sort-order contract.
+
+Still deferred: PDF/DOCX extraction and connector binary delivery, forum attachment
+bytes, full personal/group/site calendar parity, full-course/all-deadline aggregation
+in one call, participant/groups and deep quiz review. Page/Book exports are read
+one body/chapter at a time. Pagination and partial/unknown states are explicit.
+All student writes, teacher/admin operations and Attendance marking remain excluded.

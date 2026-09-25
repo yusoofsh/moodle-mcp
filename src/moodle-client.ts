@@ -184,7 +184,13 @@ export class MoodleClient {
    * The Moodle WS token is attached to the outbound request only; it never
    * reappears in anything returned to the MCP client.
    */
-  async downloadFile(fileurl: string): Promise<DownloadedFile> {
+  async downloadFile(
+    fileurl: string,
+    byteLimit = this.maxFileBytes,
+  ): Promise<DownloadedFile> {
+    if (!Number.isSafeInteger(byteLimit) || byteLimit < 1)
+      throw new Error("Invalid file byte limit");
+    const limit = Math.min(byteLimit, this.maxFileBytes);
     let parsed: URL;
     try {
       parsed = new URL(fileurl);
@@ -221,9 +227,9 @@ export class MoodleClient {
     });
     if (!res.ok) throw new Error(`Failed to fetch file: HTTP ${res.status}`);
 
-    const maxMb = Math.round(this.maxFileBytes / 1024 / 1024);
+    const maxMb = Math.round(limit / 1024 / 1024);
     const lengthHeader = res.headers.get("content-length");
-    if (lengthHeader && Number(lengthHeader) > this.maxFileBytes) {
+    if (lengthHeader && Number(lengthHeader) > limit) {
       await res.body?.cancel();
       throw new Error(
         `File too large (${Math.round(Number(lengthHeader) / 1024 / 1024)} MB); max is ${maxMb} MB. Admins can raise the cap with MOODLE_MCP_MAX_FILE_MB.`,
@@ -239,7 +245,7 @@ export class MoodleClient {
         const { value, done } = await reader.read();
         if (done) break;
         total += value.byteLength;
-        if (total > this.maxFileBytes) {
+        if (total > limit) {
           await reader.cancel();
           throw new Error(`File too large; max is ${maxMb} MB`);
         }

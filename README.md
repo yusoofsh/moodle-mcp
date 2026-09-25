@@ -2,11 +2,11 @@
 
 ## Cloudflare Workers Free — 0.5.0
 
-The password/OAuth application can now run in a SQLite-backed Durable Object without Docker or a VPS. See [the Workers deployment and migration guide](docs/CLOUDFLARE.md). All 18 read-only Moodle tools remain, subject to Moodle permissions and Worker-specific limits. Generate a compatible hash with `bun run password:hash --workers`. Container support below is retained.
+The password/OAuth application can now run in a SQLite-backed Durable Object without Docker or a VPS. See [the Workers deployment and migration guide](docs/CLOUDFLARE.md). All 21 read-only Moodle tools remain, subject to Moodle permissions and Worker-specific limits. Generate a compatible hash with `bun run password:hash --workers`. Container support below is retained.
 
 Read-only access to your Moodle account from ChatGPT or another MCP client, without installing a Moodle plugin. This MIT-licensed fork of [1alexandrer/moodle-mcp](https://github.com/1alexandrer/moodle-mcp) adds a container-hosted OAuth authorization server and hardens remote access.
 
-**Current scope:** single Moodle account, one password-authenticated owner (or an explicitly selected GitHub owner), 18 student-facing tools. This is an OAuth/OCI foundation release, not complete Moodle API coverage. [Triage and follow-up work](docs/TRIAGE.md) · [Review record](docs/REVIEW.md) · [Security model](SECURITY.md).
+**Current scope:** single Moodle account, one password-authenticated owner (or an explicitly selected GitHub owner), 21 student-facing tools. This is an OAuth/OCI foundation release, not complete Moodle API coverage. [Triage and follow-up work](docs/TRIAGE.md) · [Review record](docs/REVIEW.md) · [Security model](SECURITY.md).
 
 ## Architecture
 
@@ -120,7 +120,7 @@ Password attempts are limited to **5 per IP per 15 minutes** and **30 total per 
 
 ## Available tools
 
-Authenticated HTTP/Workers discovery returns a stable catalog of 18 read-only tools without contacting Moodle. The connection and required web-service capabilities are checked when each tool runs, so a university outage or invalid Moodle token cannot hide the tool list. `moodle_get_site_info` reports availability for the configured token. Already-connected stdio clients still filter the list by reported capabilities. Advertising a tool never grants Moodle permissions.
+Authenticated HTTP/Workers discovery returns a stable catalog of 21 read-only tools without contacting Moodle. The connection and required web-service capabilities are checked when each tool runs, so a university outage or invalid Moodle token cannot hide the tool list. `moodle_get_site_info` reports availability for the configured token. Already-connected stdio clients still filter the list by reported capabilities. Advertising a tool never grants Moodle permissions.
 
 | Tool                                                 | Function                                                        |
 | ---------------------------------------------------- | --------------------------------------------------------------- |
@@ -216,3 +216,23 @@ cached tool registry or claim role/context permission.
 presence merely when viewed, so that handler is intentionally never used. An
 unavailable or staff-only sessions API is reported, not bypassed. See
 [Student read P0 scope and validation](docs/STUDENT-READ-P0.md).
+
+## Native content and student dashboard (0.9.0)
+
+| Tool                      | Purpose                                                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `moodle_get_resource`     | Read a visible Page, Book chapter, Text/media label, Folder or File resource, using its course-module `moduleId` |
+| `moodle_get_forum_thread` | Read permitted discussion posts/replies with parent IDs, without marking read                                    |
+| `moodle_get_dashboard`    | A bounded course-progress page and a separately paginated current-user action timeline                           |
+
+The existing forum list now returns the correct `forumId` (instance ID), separately
+from `cmid`. Discussion listing includes the actual `discussionId` and readable
+first-post body using the Moodle 4.5 sort contract. Calendar course filtering now
+uses the course-specific API before pagination, rather than filtering a limited
+global page. Existing resource listing exposes Page/Book/label activities and keeps
+its text/file IDs available through structured-only gateways.
+
+HTML exports are reduced to bounded plain text plus safe links. Scripts and remote
+resources are never executed/fetched by the text parser, and no activity view or
+mark-read endpoint is invoked. PDF/DOCX extraction and forum attachment downloads
+remain separate unfinished work. See [content contracts and limits](docs/STUDENT-CONTENT.md).

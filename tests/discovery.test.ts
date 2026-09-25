@@ -45,7 +45,7 @@ async function upstream(functions: string[]) {
   });
 }
 describe("MCP discovery is independent from Moodle availability", () => {
-  it("initializes and discovers all 18 tools without invoking the upstream factory", async () => {
+  it("initializes and discovers all 21 tools without invoking the upstream factory", async () => {
     const create = vi
       .fn()
       .mockRejectedValue(

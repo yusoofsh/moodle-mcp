@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "moodle-mcp",
   "display_name": "Moodle MCP",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Give Claude access to your Moodle courses, assignments, grades, quizzes, calendar, forums, and notifications.",
   "long_description": "Moodle MCP connects Claude to any Moodle LMS instance. Ask about upcoming deadlines, check your grades, browse course resources, read assignment feedback, and more — all in natural language.\n\nSupports token-based auth (recommended) or username/password login.",
   "author": {
@@ -60,6 +60,9 @@
     }
   },
   "tools": [
+    { "name": "moodle_get_resource", "description": "Read a visible Page, Book chapter, Folder, File or Text/media resource" },
+    { "name": "moodle_get_forum_thread", "description": "Read permitted forum posts and replies without marking read" },
+    { "name": "moodle_get_dashboard", "description": "Read bounded student progress and action timeline summaries" },
     { "name": "moodle_download_file", "description": "Download a currently visible course file using its opaque fileId" },
     { "name": "moodle_get_activity_completion", "description": "Read current student activity completion and scoped progress without marking completion" },
     { "name": "moodle_get_course_completion", "description": "Read current student course completion and criteria, distinguishing unavailable from incomplete" },

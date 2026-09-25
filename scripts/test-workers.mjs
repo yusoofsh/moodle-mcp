@@ -54,6 +54,21 @@ async function start(override = {}) {
           errorcode: "invalidtoken",
           message: "sensitive-token-in-upstream-error",
         });
+      const target = new URL(request.url);
+      if (target.pathname.startsWith("/webservice/pluginfile.php/")) {
+        assert.equal(request.method, "GET");
+        assert.equal(target.searchParams.get("token"), bindings.MOODLE_TOKEN);
+        assert.ok(
+          [
+            "/webservice/pluginfile.php/70/mod_page/content/index.html",
+            "/webservice/pluginfile.php/71/mod_book/chapter/901/index.html",
+          ].includes(target.pathname),
+        );
+        return new Response(
+          "<html><head><script>BAD-SCRIPT</script></head><body><h1>Exported learning material</h1><p>Real body &amp; examples.</p></body></html>",
+          { headers: { "Content-Type": "text/html; charset=utf-8" } },
+        );
+      }
       const params = new URLSearchParams(await request.text());
       assert.equal(params.get("wstoken"), bindings.MOODLE_TOKEN);
       invokedFunctions.push(params.get("wsfunction"));
@@ -86,6 +101,69 @@ async function start(override = {}) {
               id: 1,
               name: "Recordings",
               modules: [
+                {
+                  id: 701,
+                  instance: 801,
+                  name: "Page fixture",
+                  modname: "page",
+                  uservisible: true,
+                  description: "<p>Intro only</p>",
+                  contents: [
+                    {
+                      type: "file",
+                      filename: "index.html",
+                      filepath: "/",
+                      filesize: 0,
+                      sortorder: 1,
+                      fileurl:
+                        "https://moodle.example/webservice/pluginfile.php/70/mod_page/content/index.html",
+                    },
+                  ],
+                },
+                {
+                  id: 702,
+                  instance: 802,
+                  name: "Book fixture",
+                  modname: "book",
+                  uservisible: true,
+                  contents: [
+                    {
+                      type: "content",
+                      filename: "structure",
+                      content: JSON.stringify([
+                        {
+                          title: "Chapter one",
+                          href: "901/index.html",
+                          hidden: 0,
+                          subitems: [],
+                        },
+                      ]),
+                    },
+                    {
+                      type: "file",
+                      filename: "index.html",
+                      filepath: "/901/",
+                      filesize: 0,
+                      fileurl:
+                        "https://moodle.example/webservice/pluginfile.php/71/mod_book/chapter/901/index.html",
+                    },
+                  ],
+                },
+                {
+                  id: 703,
+                  instance: 803,
+                  name: "Text notice",
+                  modname: "label",
+                  uservisible: true,
+                  description: "<p>Read these instructions.</p>",
+                },
+                {
+                  id: 705,
+                  instance: 805,
+                  name: "Forum fixture",
+                  modname: "forum",
+                  uservisible: true,
+                },
                 {
                   id: 301,
                   instance: 401,
@@ -145,6 +223,103 @@ async function start(override = {}) {
               },
             ],
             warnings: [],
+          });
+        case "mod_forum_get_forums_by_courses":
+          assert.equal(params.get("courseids[0]"), "7");
+          return Response.json([
+            {
+              id: 805,
+              cmid: 705,
+              course: 7,
+              name: "Forum fixture",
+              type: "general",
+              intro: "<p>Forum intro</p>",
+              introformat: 1,
+            },
+          ]);
+        case "mod_forum_get_forum_discussions":
+          assert.equal(params.get("forumid"), "805");
+          assert.equal(params.get("sortorder"), "-1");
+          assert.equal(params.has("sortby"), false);
+          return Response.json({
+            discussions: [
+              {
+                id: 1101,
+                discussion: 1001,
+                name: "Topic fixture",
+                userid: 55,
+                userfullname: "Tutor fixture",
+                numreplies: 1,
+                message: "<p>First post body</p>",
+                messageformat: 1,
+                timemodified: 1790340000,
+              },
+            ],
+            warnings: [],
+          });
+        case "mod_forum_get_discussion_posts":
+          assert.equal(params.get("discussionid"), "1001");
+          return Response.json({
+            forumid: 805,
+            courseid: 7,
+            posts: [
+              {
+                id: 1101,
+                discussionid: 1001,
+                subject: "First post",
+                message: "<p>Complete first post body</p>",
+                messageformat: 1,
+                parentid: null,
+                timecreated: 1790340000,
+                isdeleted: false,
+                capabilities: { view: true },
+                author: { id: 55, fullname: "Tutor" },
+              },
+              {
+                id: 1102,
+                discussionid: 1001,
+                subject: "Reply",
+                message: "Read-only reply text",
+                messageformat: 2,
+                parentid: 1101,
+                timecreated: 1790340001,
+                isdeleted: false,
+                capabilities: { view: true },
+              },
+              {
+                id: 1103,
+                discussionid: 1001,
+                message: "DO-NOT-EXPOSE-HIDDEN-POST",
+                isdeleted: false,
+                capabilities: { view: false },
+              },
+            ],
+            warnings: [],
+          });
+        case "core_calendar_get_action_events_by_course":
+        case "core_calendar_get_action_events_by_timesort":
+          if (params.get("wsfunction").endsWith("_by_course"))
+            assert.equal(params.get("courseid"), "7");
+          else assert.equal(params.get("userid"), "42");
+          return Response.json({
+            events: [
+              {
+                id: 1201,
+                name: "Essay due",
+                course: { id: 7, fullname: "Test Moodle" },
+                eventtype: "due",
+                timestart: Math.floor(Date.now() / 1000) + 86400,
+                timesort: Math.floor(Date.now() / 1000) + 86400,
+                action: {
+                  name: "Submit",
+                  itemcount: 1,
+                  actionable: true,
+                  url: "https://moodle.example/mod/assign/view.php?id=301",
+                },
+              },
+            ],
+            firstid: 1201,
+            lastid: 1201,
           });
         case "mod_assign_get_assignments":
           assert.equal(params.get("courseids[0]"), "7");
@@ -511,7 +686,7 @@ try {
     assert.equal((await exchange(id, replay)).status, 400);
   });
   await check(
-    "MCP initialize, all 18 read-only tools, Moodle request",
+    "MCP initialize, all 21 read-only tools, Moodle request",
     async () => {
       const init = await rpc(granted.access_token, "initialize", {
         protocolVersion: "2025-11-25",
@@ -686,6 +861,101 @@ try {
       assert.equal(
         info.json.result.structuredContent.data.catalog.toolCount,
         Object.keys(TOOL_FUNCTIONS).length,
+      );
+    },
+  );
+  await check(
+    "Page/Book exported HTML and label text are readable without browser views",
+    async () => {
+      for (const moduleId of [701, 702, 703]) {
+        const r = await rpc(granted.access_token, "tools/call", {
+          name: "moodle_get_resource",
+          arguments: { moduleId, courseId: 7 },
+        });
+        assert.equal(r.status, 200, r.text);
+        assert.notEqual(r.json.result.isError, true, r.text);
+        const result = r.json.result.structuredContent;
+        assert.equal(result.data.contentStatus, "available");
+        assert.equal(result.data.content.untrusted, true);
+        assert.match(
+          result.data.content.text,
+          moduleId === 703 ? /Read these instructions/ : /Real body & examples/,
+        );
+        assert.ok(!r.text.includes("BAD-SCRIPT"));
+        assert.ok(!r.text.includes(bindings.MOODLE_TOKEN));
+        assert.deepEqual(JSON.parse(r.json.result.content[0].text), result);
+      }
+    },
+  );
+  await check(
+    "forum instance IDs, discussion IDs and permitted thread bodies use correct API contracts",
+    async () => {
+      const forums = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_list_forums",
+        arguments: { courseId: 7 },
+      });
+      assert.equal(
+        forums.json.result.structuredContent.data.items[0].forumId,
+        805,
+      );
+      assert.equal(
+        forums.json.result.structuredContent.data.items[0].cmid,
+        705,
+      );
+      const discussions = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_forum_discussions",
+        arguments: { forumId: 805 },
+      });
+      assert.equal(
+        discussions.json.result.structuredContent.data.items[0].discussionId,
+        1001,
+      );
+      assert.match(
+        discussions.json.result.structuredContent.data.items[0].content.text,
+        /First post body/,
+      );
+      const thread = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_forum_thread",
+        arguments: { discussionId: 1001 },
+      });
+      assert.equal(thread.json.result.structuredContent.data.items.length, 2);
+      assert.equal(
+        thread.json.result.structuredContent.data.items[1].parentId,
+        1101,
+      );
+      assert.ok(!thread.text.includes("DO-NOT-EXPOSE-HIDDEN-POST"));
+    },
+  );
+  await check(
+    "bounded dashboard and course-scoped action timeline preserve structured output",
+    async () => {
+      const calendar = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_calendar_events",
+        arguments: { courseId: 7 },
+      });
+      assert.notEqual(calendar.json.result.isError, true, calendar.text);
+      assert.equal(
+        calendar.json.result.structuredContent.data.items[0].courseId,
+        7,
+      );
+      const dashboard = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_dashboard",
+        arguments: { maxCourses: 1 },
+      });
+      assert.notEqual(dashboard.json.result.isError, true, dashboard.text);
+      assert.equal(
+        dashboard.json.result.structuredContent.data.courses.length,
+        1,
+      );
+      assert.equal(
+        dashboard.json.result.structuredContent.data.timeline.items[0]
+          .isDeadline,
+        true,
+      );
+      assert.ok(
+        !invokedFunctions.some((fn) =>
+          /_view_|_mark_|_save_|_submit_|tool_mobile_get_content/.test(fn),
+        ),
       );
     },
   );

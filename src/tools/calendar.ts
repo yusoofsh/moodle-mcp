@@ -1,128 +1,54 @@
+import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClientSource } from "../moodle-source.js";
+import type { MoodleClient } from "../moodle-client.js";
 import {
   canRegister,
   getToolClient,
   READ_ONLY,
   AUTH_META,
 } from "../tool-policy.js";
-import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/server";
-import type { MoodleClient } from "../moodle-client.js";
-
-interface CalendarEvent {
-  id: number;
-  name: string;
-  courseid: number;
-  timestart: number;
-  timeduration: number;
-  eventtype: string;
-  course?: { id: number; shortname: string; fullname: string };
-  description?: string;
-  url?: string;
-}
-
-interface CalendarResponse {
-  events: CalendarEvent[];
-}
-
-function formatDate(ts: number): string {
-  return new Date(ts * 1000).toLocaleString("en-CA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
+import { idSchema, toolResult } from "../student/result.js";
+import { readCalendar } from "../student/dashboard.js";
+import { contentOutputs } from "../student/content-output.js";
 export async function getCalendarEvents(
   client: MoodleClient,
   courseId?: number,
   daysAhead = 30,
 ): Promise<string> {
-  if (!client.supports("core_calendar_get_action_events_by_timesort")) {
-    return "Calendar API is not enabled on your Moodle. Ask your admin to enable core_calendar web services.";
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  const until = now + daysAhead * 86400;
-
-  const data = await client.call<CalendarResponse>(
-    "core_calendar_get_action_events_by_timesort",
-    {
-      timesortfrom: now,
-      timesortto: until,
-      limitnum: 50,
-    },
-  );
-
-  let events = data.events ?? [];
-  if (courseId) {
-    events = events.filter((e) => e.courseid === courseId);
-  }
-
-  if (events.length === 0) {
-    return courseId
-      ? `No upcoming events in the next ${daysAhead} days for course ${courseId}.`
-      : `No upcoming events in the next ${daysAhead} days.`;
-  }
-
-  // Group by course
-  const byCourse = new Map<string, CalendarEvent[]>();
-  for (const event of events) {
-    const key = event.course?.fullname ?? `Course ${event.courseid}`;
-    if (!byCourse.has(key)) byCourse.set(key, []);
-    byCourse.get(key)!.push(event);
-  }
-
-  const lines: string[] = [`## Upcoming Events (next ${daysAhead} days)\n`];
-
-  for (const [courseName, courseEvents] of byCourse) {
-    lines.push(`### ${courseName}`);
-    for (const e of courseEvents) {
-      const type = e.eventtype ? `\`${e.eventtype}\`` : "";
-      lines.push(`- **${e.name}** — ${formatDate(e.timestart)} ${type}`);
-      if (e.url) lines.push(`  [Open](${e.url})`);
-    }
-    lines.push("");
-  }
-
-  return lines.join("\n");
+  return (await readCalendar(client, { courseId, daysAhead })).text;
 }
-
 export function registerCalendarTools(
   server: McpServer,
   source: MoodleClientSource,
 ): void {
-  if (canRegister(source, "moodle_get_calendar_events"))
-    server.registerTool(
-      "moodle_get_calendar_events",
-      {
-        description:
-          "Get upcoming calendar events (assignments due, quizzes opening, etc.), optionally filtered to one course. Defaults to the next 30 days.",
-        inputSchema: z.object({
-          courseId: z
-            .number()
-            .optional()
-            .describe("Filter to a specific course ID (optional)"),
-          daysAhead: z
-            .number()
-            .optional()
-            .describe("How many days ahead to look (default: 30)"),
-        }),
-        annotations: READ_ONLY,
-        _meta: AUTH_META,
-      },
-      async ({ courseId, daysAhead }) => {
-        const client = await getToolClient(
-          source,
-          "moodle_get_calendar_events",
-        );
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: await getCalendarEvents(client, courseId, daysAhead),
-            },
-          ],
-        };
-      },
-    );
+  if (!canRegister(source, "moodle_get_calendar_events")) return;
+  server.registerTool(
+    "moodle_get_calendar_events",
+    {
+      description:
+        "Read current-user Moodle action events in a bounded window (default next 30 days), with ISO UTC dates, course IDs, past/upcoming distinction and upstream pagination. Optional courseId uses course-specific API pagination. Reuse returned from/to and afterEventId for next page. This is an action timeline, not all personal/group/site calendar entries; past opening events are not automatically overdue tasks. Never creates or edits events.",
+      inputSchema: z
+        .object({
+          courseId: idSchema.optional(),
+          daysAhead: z.number().int().min(1).max(90).optional(),
+          lookbackDays: z.number().int().min(0).max(90).optional(),
+          limit: z.number().int().min(1).max(100).optional(),
+          afterEventId: idSchema.optional(),
+          from: z.number().int().min(0).optional(),
+          to: z.number().int().positive().optional(),
+        })
+        .strict(),
+      outputSchema: contentOutputs.moodle_get_calendar_events,
+      annotations: READ_ONLY,
+      _meta: AUTH_META,
+    },
+    async (options) =>
+      toolResult(
+        await readCalendar(
+          await getToolClient(source, "moodle_get_calendar_events"),
+          options,
+        ),
+      ),
+  );
 }

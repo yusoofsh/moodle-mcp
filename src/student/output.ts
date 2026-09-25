@@ -228,3 +228,5 @@ export const studentOutputs = {
     }),
   }),
 };
+
+export { activity as activityOutputSchema, summary as activitySummarySchema };

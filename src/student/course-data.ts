@@ -31,6 +31,16 @@ export const completionSchema = z.object({
     )
     .optional(),
 });
+export const resourceContentSchema = z.object({
+  type: z.string(),
+  filename: z.string().optional(),
+  filepath: z.string().optional(),
+  fileurl: z.string().nullish(),
+  filesize: z.number().int().nonnegative().optional(),
+  mimetype: z.string().nullish(),
+  sortorder: z.number().int().nullish(),
+  content: z.string().nullish(),
+});
 export const moduleSchema = z.object({
   id: idSchema,
   name: z.string(),
@@ -40,6 +50,7 @@ export const moduleSchema = z.object({
   url: z.string().optional(),
   description: z.string().optional(),
   availabilityinfo: z.string().optional(),
+  contents: z.array(resourceContentSchema).optional(),
   completion: z.number().int().optional(),
   completiondata: z
     .union([completionSchema, z.array(z.unknown()).length(0)])

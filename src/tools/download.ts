@@ -16,11 +16,12 @@ interface ModuleContent {
 }
 
 interface CourseModule {
-  uservisible?: boolean;
+  uservisible?: boolean | number;
   contents?: ModuleContent[];
 }
 
 interface CourseSection {
+  uservisible?: boolean | number;
   modules: CourseModule[];
 }
 
@@ -65,8 +66,9 @@ export async function reauthorize(
       },
     );
     for (const section of sections) {
+      if (section.uservisible === false || section.uservisible === 0) continue;
       for (const mod of section.modules) {
-        if (mod.uservisible === false) continue;
+        if (mod.uservisible === false || mod.uservisible === 0) continue;
         for (const file of mod.contents ?? []) {
           if (file.type === "file" && file.fileurl === ref.fileurl) return true;
         }

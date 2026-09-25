@@ -8,17 +8,20 @@ import type { MoodleClient } from "../src/moodle-client.js";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("read-only tools and file access", () => {
-  it("only advertises site information when no Moodle APIs are available", () => {
+  it("retains diagnostic tools with no hard API requirement in local mode", () => {
     const registerTool = vi.fn();
     registerAllTools(
       { registerTool } as unknown as McpServer,
       { supports: () => false } as unknown as MoodleClient,
     );
-    expect(registerTool.mock.calls.map((call) => call[0])).toEqual([
-      "moodle_get_site_info",
-    ]);
+    expect(registerTool.mock.calls.map((call) => call[0]).sort()).toEqual(
+      Object.entries(TOOL_FUNCTIONS)
+        .filter(([, required]) => required.length === 0)
+        .map(([name]) => name)
+        .sort(),
+    );
   });
-  it("registers 18 tools with read-only and OAuth annotations", () => {
+  it("registers 21 tools with read-only and OAuth annotations", () => {
     const registerTool = vi.fn();
     registerAllTools(
       { registerTool } as unknown as McpServer,
@@ -87,3 +90,35 @@ describe("read-only tools and file access", () => {
   });
 });
 // Worker HTTP fail-closed behavior is tested in workerd by scripts/test-workers.mjs.
+
+it.each([
+  { section: false, module: true },
+  { section: 0, module: true },
+  { section: true, module: 0 },
+])(
+  "reauthorizes generated resource file IDs against numeric and section visibility: %s",
+  async ({ section, module }) => {
+    const ref = {
+      userId: 42,
+      courseId: 7,
+      fileurl: "https://moodle.example/pluginfile.php/a",
+      mime: "text/html",
+      filename: "index.html",
+      filesize: 0,
+    };
+    const fake = {
+      call: async () => [
+        {
+          uservisible: section,
+          modules: [
+            {
+              uservisible: module,
+              contents: [{ type: "file", fileurl: ref.fileurl }],
+            },
+          ],
+        },
+      ],
+    } as unknown as MoodleClient;
+    expect(await reauthorize(fake, ref)).toBe(false);
+  },
+);

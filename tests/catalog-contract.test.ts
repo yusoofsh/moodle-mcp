@@ -1,3 +1,4 @@
+import { contentOutputs } from "../src/student/content-output.js";
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -31,10 +32,12 @@ describe("backend catalog contract", () => {
     registerAllTools({ registerTool } as unknown as McpServer, async () => {
       throw new Error("no upstream");
     });
-    for (const name of Object.keys(studentOutputs)) {
+    for (const name of Object.keys({ ...studentOutputs, ...contentOutputs })) {
       const [, options] = registerTool.mock.calls.find((c) => c[0] === name)!;
       expect(options.outputSchema).toBe(
-        studentOutputs[name as keyof typeof studentOutputs],
+        { ...studentOutputs, ...contentOutputs }[
+          name as keyof typeof studentOutputs | keyof typeof contentOutputs
+        ],
       );
       expect(options.outputSchema.shape.data.shape).toBeDefined();
     }
