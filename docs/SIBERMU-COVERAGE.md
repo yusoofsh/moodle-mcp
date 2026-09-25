@@ -1,4 +1,4 @@
-# SiberMu API coverage and document delivery (0.10.0)
+# SiberMu API coverage and document delivery (0.10.1)
 
 This release expands the prior 21-tool reader to 31 high-level read-only tools.
 The current authenticated site's advertised API names are the inventory source,
@@ -92,3 +92,20 @@ actual deployment; no assumption is made that all new tool names are callable.
 Still outside this release: write workflows and their confirmation/authorization
 lifecycle, teacher/admin parity, unreviewed custom plugins, OCR/large-file support,
 and complete parameter-level coverage of every exposed Moodle API.
+
+## File-only client pagination (0.10.1)
+
+Live Composio testing confirmed actual PDF and PPTX text arrives using the existing
+download action, but its cached schema only accepts fileId. The backend therefore
+returns a signed/encrypted `nextFileId` containing a bounded document position and
+SHA-256 of the source bytes. Passing that value as fileId continues the same file
+without unsupported extra arguments. It grants no new Moodle operation or access.
+Every window checks account/token binding, expiry, current course file visibility,
+byte identity and parser bounds. Changed documents require a fresh start. No
+continuation is issued when parsing does not advance. Text-only clients receive
+the same nextFileId in the JSON representation as structured clients.
+
+Regression tests cover complete PDF/character traversal using fileId-only calls,
+opaque payloads, tampering, account and token isolation, expiry, changed content,
+visibility loss, unsupported formats and exact MCP JSON parity. The authenticated
+workerd test also advances a character window through the public download tool.

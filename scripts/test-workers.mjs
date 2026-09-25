@@ -1045,6 +1045,26 @@ try {
         );
         assert.ok(!r.text.includes(bindings.MOODLE_TOKEN));
       }
+      const firstWindow = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_download_file",
+        arguments: { fileId, maxChars: 12 },
+      });
+      const firstData = firstWindow.json.result.structuredContent.data;
+      assert.equal(typeof firstData.nextFileId, "string");
+      const tail = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_download_file",
+        arguments: { fileId: firstData.nextFileId },
+      });
+      assert.notEqual(tail.json.result.isError, true, tail.text);
+      assert.equal(
+        tail.json.result.structuredContent.data.document.pages[0].charOffset,
+        12,
+      );
+      assert.equal(
+        tail.json.result.structuredContent.data.document.text.length,
+        12,
+      );
+      assert.ok(!tail.text.includes(bindings.MOODLE_TOKEN));
       const denied = await rpc(granted.access_token, "tools/call", {
         name: "moodle_read_document",
         arguments: { fileId: "f_not_issued" },

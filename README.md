@@ -1,6 +1,6 @@
 # Moodle MCP — student reads, document text and API coverage
 
-Version **0.10.0** provides **31 high-level read-only MCP tools**, a restricted
+Version **0.10.1** provides **31 high-level read-only MCP tools**, a restricted
 registry of reviewed Moodle Web Service adapters, and authenticated remote access
 on Cloudflare Workers or a Node/OCI server. This MIT-licensed fork of
 [1alexandrer/moodle-mcp](https://github.com/1alexandrer/moodle-mcp) targets a single
@@ -225,3 +225,15 @@ successfully inventoried.
 
 The original MIT license and attribution are retained. Reference-project ideas
 were evaluated without copying differently licensed implementation code.
+
+## Document continuation through cached fileId-only clients (0.10.1)
+
+The result of `moodle_download_file({fileId})` now contains `data.nextFileId`. Pass
+that opaque value unchanged as the next call's `fileId` until it is null. Each
+window still checks current Moodle permissions and re-downloads within the same
+limits. The cursor is encrypted/authenticated, account/token-bound, expires like
+other file IDs, and binds the bytes with SHA-256 so a changed document cannot be
+silently joined to earlier pages. Do not combine it with explicit page controls;
+use the original fileId for a new explicit window. A final window is not labelled
+a complete document on its own; consumers must retain all preceding windows.
+This is ordinary file pagination, not an arbitrary API-dispatch mechanism.
