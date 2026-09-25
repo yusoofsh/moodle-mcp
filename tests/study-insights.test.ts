@@ -64,6 +64,10 @@ beforeEach(() => {
     if (fn === "mod_assign_get_submission_status") return status;
     if (fn === "gradereport_overview_get_course_grades")
       return { grades: [{ courseid: 7, grade: "0" }] };
+    if (fn === "core_calendar_get_action_events_by_course") {
+      expect(p.courseid).toBe(7);
+      return { events: [], firstid: 0, lastid: 0 };
+    }
     if (fn === "core_calendar_get_action_events_by_timesort")
       return { events: [], firstid: 0, lastid: 0 };
     throw new Error("Unexpected " + fn);
@@ -161,6 +165,13 @@ describe("search and actual instruction bodies", () => {
     expect(r.data.gradeOverview).toEqual({
       grades: [{ courseid: 7, grade: "0" }],
     });
+    expect(
+      call.mock.calls.some(
+        (c) =>
+          c[0] === "core_calendar_get_action_events_by_course" &&
+          c[1]?.courseid === 7,
+      ),
+    ).toBe(true);
     expect(
       call.mock.calls.every(
         (c) => !/_view_|_mark_|_submit_|_save_|_start_/.test(c[0]),

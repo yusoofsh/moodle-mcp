@@ -606,6 +606,7 @@ export async function readBriefing(
     timeline = await readCalendar(
       client,
       {
+        courseId: options.courseId,
         daysAhead: options.daysAhead ?? (period === "daily" ? 7 : 30),
         lookbackDays: 7,
         limit: 50,
