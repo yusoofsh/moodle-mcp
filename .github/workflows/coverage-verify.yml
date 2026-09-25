@@ -28,11 +28,12 @@ jobs:
           node scripts/generate-api-declarations.mjs
           bun scripts/refresh-tool-manifest.ts
           bun run format
+          git restore .github/workflows/publish.yml .github/workflows/workers-deploy.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add bun.lock manifest.json package.json src tests scripts README.md SECURITY.md docs .github/workflows/publish.yml .github/workflows/workers-deploy.yml
+          git add bun.lock manifest.json package.json src tests scripts README.md SECURITY.md docs
           if ! git diff --cached --quiet; then
-            git commit -m 'chore: persist reviewed coverage extensions and regression gates'
+            git commit -m 'chore: persist reviewed coverage extensions and regression tests'
             git push origin HEAD:feat/sibermu-api-coverage
           fi
       - run: bun install --frozen-lockfile --ignore-scripts
