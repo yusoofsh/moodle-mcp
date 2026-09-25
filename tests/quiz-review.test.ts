@@ -1,14 +1,141 @@
-import { describe,it,expect,vi,beforeEach } from 'vitest';
-import type { MoodleClient } from '../src/moodle-client.js';
-import { readQuizReview } from '../src/student/quiz-review.js';
-let client:MoodleClient,call:ReturnType<typeof vi.fn>,attempt:any,review:any;
-beforeEach(()=>{attempt={id:11,quiz:201,userid:42,state:'finished',preview:0,timefinish:1790000000,layout:'1,0',attempt:1,sumgrades:0};review={attempt,grade:0,questions:[{slot:1,type:'multichoice',page:0,questionnumber:'1',html:'<p>Released question and feedback</p>',mark:'0',maxmark:1}],additionaldata:[]};call=vi.fn(async(fn:string)=>fn==='core_course_get_contents'?[{id:1,name:'Week',modules:[{id:101,instance:201,name:'Quiz',modname:'quiz',uservisible:true}]}]:fn==='mod_quiz_get_user_attempts'?{attempts:[attempt]}:review);client={userId:42,siteUrl:'https://moodle.example',profile:{functions:[]},supports:()=>true,call} as unknown as MoodleClient;});
-describe('finished own quiz review only',()=>{
- it('uses self finished non-preview attempt selection and preserves a released zero grade',async()=>{const r=await readQuizReview(client,{courseId:7,quizId:201});expect(call).toHaveBeenCalledWith('mod_quiz_get_user_attempts',{quizid:201,userid:42,status:'finished',includepreviews:false});expect(r.data.attempt?.grade).toBe(0);expect(r.data.questions?.[0].content.text).toContain('Released question');expect(r.data.canStartOrSubmitThroughMcp).toBe(false);});
- it.each(['inprogress','overdue','abandoned'])('refuses %s attempts before review',async state=>{attempt.state=state;await expect(readQuizReview(client,{courseId:7,quizId:201,attemptId:11})).rejects.toThrow(/finished/);expect(call).toHaveBeenCalledTimes(2);});
- it('refuses other-user or preview attempts',async()=>{attempt.userid=99;await expect(readQuizReview(client,{courseId:7,quizId:201,attemptId:11})).rejects.toThrow();attempt.userid=42;attempt.preview=1;await expect(readQuizReview(client,{courseId:7,quizId:201,attemptId:11})).rejects.toThrow();});
- it('withholds computed marks when Moodle suppresses attempt sumgrades',async()=>{review.attempt={...attempt,sumgrades:null};review.grade=100;const r=await readQuizReview(client,{courseId:7,quizId:201});expect(r.data.attempt?.grade).toBeNull();expect(r.data.questions?.[0].mark).toBeNull();});
- it('does not substitute active attempt APIs when review is denied',async()=>{const original=call.getMockImplementation()!;call.mockImplementation(async(fn,p)=>{if(fn==='mod_quiz_get_attempt_review')throw new Error('Review not allowed');return original(fn,p);});const r=await readQuizReview(client,{courseId:7,quizId:201});expect(r.data.questions).toBeNull();expect(call.mock.calls.map(c=>c[0])).toEqual(['core_course_get_contents','mod_quiz_get_user_attempts','mod_quiz_get_attempt_review']);});
- it('reports multi-page review partial and preserves page continuation',async()=>{review.attempt.layout='1,0,2,0';const r=await readQuizReview(client,{courseId:7,quizId:201});expect(r.data.totalPages).toBe(2);expect(r.data.nextPage).toBe(1);expect(r.data.complete).toBe(false);});
- it('rejects another requested userid and raw attempt passwords',async()=>{await expect(readQuizReview(client,{courseId:7,quizId:201,userid:99} as any)).rejects.toThrow();await expect(readQuizReview(client,{courseId:7,quizId:201,password:'secret'} as any)).rejects.toThrow();expect(call).not.toHaveBeenCalled();});
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { MoodleClient } from "../src/moodle-client.js";
+import { readQuizReview } from "../src/student/quiz-review.js";
+let client: MoodleClient,
+  call: ReturnType<typeof vi.fn>,
+  attempt: any,
+  review: any;
+beforeEach(() => {
+  attempt = {
+    id: 11,
+    quiz: 201,
+    userid: 42,
+    state: "finished",
+    preview: 0,
+    timefinish: 1790000000,
+    layout: "1,0",
+    attempt: 1,
+    sumgrades: 0,
+  };
+  review = {
+    attempt,
+    grade: 0,
+    questions: [
+      {
+        slot: 1,
+        type: "multichoice",
+        page: 0,
+        questionnumber: "1",
+        html: "<p>Released question and feedback</p>",
+        mark: "0",
+        maxmark: 1,
+      },
+    ],
+    additionaldata: [],
+  };
+  call = vi.fn(async (fn: string) =>
+    fn === "core_course_get_contents"
+      ? [
+          {
+            id: 1,
+            name: "Week",
+            modules: [
+              {
+                id: 101,
+                instance: 201,
+                name: "Quiz",
+                modname: "quiz",
+                uservisible: true,
+              },
+            ],
+          },
+        ]
+      : fn === "mod_quiz_get_user_attempts"
+        ? { attempts: [attempt] }
+        : review,
+  );
+  client = {
+    userId: 42,
+    siteUrl: "https://moodle.example",
+    profile: { functions: [] },
+    supports: () => true,
+    call,
+  } as unknown as MoodleClient;
+});
+describe("finished own quiz review only", () => {
+  it("uses self finished non-preview attempt selection and preserves a released zero grade", async () => {
+    const r = await readQuizReview(client, { courseId: 7, quizId: 201 });
+    expect(call).toHaveBeenCalledWith("mod_quiz_get_user_attempts", {
+      quizid: 201,
+      userid: 42,
+      status: "finished",
+      includepreviews: false,
+    });
+    expect(r.data.attempt?.grade).toBe(0);
+    expect(r.data.questions?.[0].content.text).toContain("Released question");
+    expect(r.data.canStartOrSubmitThroughMcp).toBe(false);
+  });
+  it.each(["inprogress", "overdue", "abandoned"])(
+    "refuses %s attempts before review",
+    async (state) => {
+      attempt.state = state;
+      await expect(
+        readQuizReview(client, { courseId: 7, quizId: 201, attemptId: 11 }),
+      ).rejects.toThrow(/finished/);
+      expect(call).toHaveBeenCalledTimes(2);
+    },
+  );
+  it("refuses other-user or preview attempts", async () => {
+    attempt.userid = 99;
+    await expect(
+      readQuizReview(client, { courseId: 7, quizId: 201, attemptId: 11 }),
+    ).rejects.toThrow();
+    attempt.userid = 42;
+    attempt.preview = 1;
+    await expect(
+      readQuizReview(client, { courseId: 7, quizId: 201, attemptId: 11 }),
+    ).rejects.toThrow();
+  });
+  it("withholds computed marks when Moodle suppresses attempt sumgrades", async () => {
+    review.attempt = { ...attempt, sumgrades: null };
+    review.grade = 100;
+    const r = await readQuizReview(client, { courseId: 7, quizId: 201 });
+    expect(r.data.attempt?.grade).toBeNull();
+    expect(r.data.questions?.[0].mark).toBeNull();
+  });
+  it("does not substitute active attempt APIs when review is denied", async () => {
+    const original = call.getMockImplementation()!;
+    call.mockImplementation(async (fn, p) => {
+      if (fn === "mod_quiz_get_attempt_review")
+        throw new Error("Review not allowed");
+      return original(fn, p);
+    });
+    const r = await readQuizReview(client, { courseId: 7, quizId: 201 });
+    expect(r.data.questions).toBeNull();
+    expect(call.mock.calls.map((c) => c[0])).toEqual([
+      "core_course_get_contents",
+      "mod_quiz_get_user_attempts",
+      "mod_quiz_get_attempt_review",
+    ]);
+  });
+  it("reports multi-page review partial and preserves page continuation", async () => {
+    review.attempt.layout = "1,0,2,0";
+    const r = await readQuizReview(client, { courseId: 7, quizId: 201 });
+    expect(r.data.totalPages).toBe(2);
+    expect(r.data.nextPage).toBe(1);
+    expect(r.data.complete).toBe(false);
+  });
+  it("rejects another requested userid and raw attempt passwords", async () => {
+    await expect(
+      readQuizReview(client, { courseId: 7, quizId: 201, userid: 99 } as any),
+    ).rejects.toThrow();
+    await expect(
+      readQuizReview(client, {
+        courseId: 7,
+        quizId: 201,
+        password: "secret",
+      } as any),
+    ).rejects.toThrow();
+    expect(call).not.toHaveBeenCalled();
+  });
 });
