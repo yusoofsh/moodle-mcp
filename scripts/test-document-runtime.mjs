@@ -73,9 +73,15 @@ try {
       filename: "test.pptx",
       mime: "application/zip",
       bytes: zipSync({
-        "ppt/presentation.xml": strToU8('<p:presentation xmlns:p="p" xmlns:r="r"><p:sldIdLst><p:sldId id="1" r:id="rId1"/></p:sldIdLst></p:presentation>'),
-        "ppt/_rels/presentation.xml.rels": strToU8('<Relationships><Relationship Id="rId1" Target="slides/slide1.xml"/></Relationships>'),
-        "ppt/slides/slide1.xml": strToU8('<p:sld xmlns:p="p" xmlns:a="a"><a:p><a:r><a:t>Verified PPTX text inside workerd</a:t></a:r></a:p></p:sld>'),
+        "ppt/presentation.xml": strToU8(
+          '<p:presentation xmlns:p="p" xmlns:r="r"><p:sldIdLst><p:sldId id="1" r:id="rId1"/></p:sldIdLst></p:presentation>',
+        ),
+        "ppt/_rels/presentation.xml.rels": strToU8(
+          '<Relationships><Relationship Id="rId1" Target="slides/slide1.xml"/></Relationships>',
+        ),
+        "ppt/slides/slide1.xml": strToU8(
+          '<p:sld xmlns:p="p" xmlns:a="a"><a:p><a:r><a:t>Verified PPTX text inside workerd</a:t></a:r></a:p></p:sld>',
+        ),
       }),
       expected: "Verified PPTX text inside workerd",
     },
