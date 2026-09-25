@@ -1,3 +1,7 @@
+import { studentOutputs } from "../student/output.js";
+import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/server";
+import type { MoodleClient } from "../moodle-client.js";
 import type { MoodleClientSource } from "../moodle-source.js";
 import {
   canRegister,
@@ -5,140 +9,25 @@ import {
   READ_ONLY,
   AUTH_META,
 } from "../tool-policy.js";
-import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/server";
-import type { MoodleClient } from "../moodle-client.js";
+import {
+  readAssignments,
+  readAssignmentStatus,
+} from "../student/assignments.js";
+import { idSchema, pageShape, toolResult } from "../student/result.js";
 
-interface AssignmentDetail {
-  id: number;
-  coursemodule: number;
-  name: string;
-  intro: string;
-  duedate: number;
-  allowsubmissionsfromdate: number;
-  grade: number;
-  nosubmissions: number;
-}
-
-interface AssignmentsResponse {
-  courses: { id: number; assignments: AssignmentDetail[] }[];
-}
-
-interface CourseSection {
-  id: number;
-  name: string;
-  modules: { id: number; name: string; modname: string }[];
-}
-
-interface SubmissionStatus {
-  lastattempt?: {
-    submission?: { status: string; timemodified: number };
-    graded: boolean;
-  };
-  feedback?: {
-    gradefordisplay: string;
-    gradeddate: number;
-    grade?: { grade: string };
-  };
-}
-
-function formatDate(ts: number): string {
-  if (!ts) return "No due date";
-  return new Date(ts * 1000).toLocaleString("en-CA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
+// Retain the old helper signatures for integrations importing them directly.
 export async function listAssignments(
   client: MoodleClient,
   courseId: number,
 ): Promise<string> {
-  if (!client.supports("mod_assign_get_assignments")) {
-    return "Assignments API is not enabled on your Moodle. Ask your admin to enable the mod_assign web service.";
-  }
-
-  const [sections, assignData] = await Promise.all([
-    client.call<CourseSection[]>("core_course_get_contents", {
-      courseid: courseId,
-    }),
-    client.call<AssignmentsResponse>("mod_assign_get_assignments", {
-      "courseids[0]": courseId,
-    }),
-  ]);
-
-  const assignments = assignData.courses[0]?.assignments ?? [];
-  const byModule = new Map(assignments.map((a) => [a.coursemodule, a]));
-
-  const lines: string[] = [`## Assignments — Course ${courseId}\n`];
-  let hasAny = false;
-
-  for (const section of sections) {
-    const assignMods = section.modules.filter((m) => m.modname === "assign");
-    if (assignMods.length === 0) continue;
-
-    lines.push(`### ${section.name || "General"}`);
-    hasAny = true;
-
-    for (const mod of assignMods) {
-      const detail = byModule.get(mod.id);
-      if (!detail) {
-        lines.push(`- **${mod.name}** *(details unavailable)*`);
-        continue;
-      }
-      const due = detail.duedate
-        ? `Due: ${formatDate(detail.duedate)}`
-        : "No due date";
-      const maxGrade = detail.grade > 0 ? ` | Max grade: ${detail.grade}` : "";
-      lines.push(`- **${detail.name}** — ${due}${maxGrade}`);
-      lines.push(`  ID: \`${detail.id}\` (use with moodle_get_assignment)`);
-    }
-    lines.push("");
-  }
-
-  if (!hasAny) return "No assignments found in this course.";
-  return lines.join("\n");
+  return (await readAssignments(client, courseId)).text;
 }
-
 export async function getAssignment(
   client: MoodleClient,
   assignmentId: number,
 ): Promise<string> {
-  if (!client.supports("mod_assign_get_submission_status")) {
-    return "Assignment submission status API is not enabled on your Moodle.";
-  }
-
-  const status = await client.call<SubmissionStatus>(
-    "mod_assign_get_submission_status",
-    {
-      assignid: assignmentId,
-    },
-  );
-
-  const lines: string[] = [
-    `## Assignment ${assignmentId} — Submission Status\n`,
-  ];
-
-  const submission = status.lastattempt?.submission;
-  if (submission) {
-    lines.push(`**Status:** ${submission.status}`);
-    if (submission.timemodified) {
-      lines.push(`**Last modified:** ${formatDate(submission.timemodified)}`);
-    }
-  } else {
-    lines.push("**Status:** Not submitted");
-  }
-
-  const graded = status.lastattempt?.graded;
-  lines.push(`**Graded:** ${graded ? "Yes" : "No"}`);
-
-  if (status.feedback) {
-    lines.push(`\n**Grade:** ${status.feedback.gradefordisplay}`);
-  }
-
-  return lines.join("\n");
+  return (await readAssignmentStatus(client, assignmentId)).text;
 }
-
 export function registerAssignmentTools(
   server: McpServer,
   source: MoodleClientSource,
@@ -148,50 +37,49 @@ export function registerAssignmentTools(
       "moodle_list_assignments",
       {
         description:
-          "List all assignments in a course, grouped by the course's sections, with due dates and grade info. Returns assignment IDs for use with moodle_get_assignment.",
-        inputSchema: z.object({
-          courseId: z.number().describe("Course ID from moodle_list_courses"),
-        }),
+          "Read visible course assignments with correct assignmentId/instanceId and cmid, effective due/open/cutoff dates in Unix seconds and ISO UTC, grading type, explicit unknown states and warnings. Structured JSON is authoritative; text is included for gateways. Optional offset/limit paginate the locally fetched visible list. Does not submit or change anything.",
+        inputSchema: z
+          .object({
+            courseId: idSchema.describe("Course ID from moodle_list_courses"),
+            ...pageShape,
+          })
+          .strict(),
+        outputSchema: studentOutputs.moodle_list_assignments,
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ courseId }) => {
-        const client = await getToolClient(source, "moodle_list_assignments");
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: await listAssignments(client, courseId),
-            },
-          ],
-        };
-      },
+      async ({ courseId, offset, limit }) =>
+        toolResult(
+          await readAssignments(
+            await getToolClient(source, "moodle_list_assignments"),
+            courseId,
+            { offset, limit },
+          ),
+        ),
     );
-
   if (canRegister(source, "moodle_get_assignment"))
     server.registerTool(
       "moodle_get_assignment",
       {
         description:
-          "Get submission status and grade feedback for a specific assignment.",
-        inputSchema: z.object({
-          assignmentId: z
-            .number()
-            .describe("Assignment ID from moodle_list_assignments"),
-        }),
+          "Read the authenticated student’s latest assignment submission/team status, individual deadline extension and released grade feedback. Uses assignmentId (not cmid). Missing results stay unknown rather than Not submitted. Returns structured JSON and text; no submission or grading actions.",
+        inputSchema: z
+          .object({
+            assignmentId: idSchema.describe(
+              "Assignment instance ID from moodle_list_assignments, not cmid",
+            ),
+          })
+          .strict(),
+        outputSchema: studentOutputs.moodle_get_assignment,
         annotations: READ_ONLY,
         _meta: AUTH_META,
       },
-      async ({ assignmentId }) => {
-        const client = await getToolClient(source, "moodle_get_assignment");
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: await getAssignment(client, assignmentId),
-            },
-          ],
-        };
-      },
+      async ({ assignmentId }) =>
+        toolResult(
+          await readAssignmentStatus(
+            await getToolClient(source, "moodle_get_assignment"),
+            assignmentId,
+          ),
+        ),
     );
 }

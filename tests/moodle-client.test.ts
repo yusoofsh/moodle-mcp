@@ -125,3 +125,40 @@ describe("MoodleClient.downloadFile", () => {
     expect(mockFetch.mock.calls.at(-1)?.[1].redirect).toBe("manual");
   });
 });
+
+describe("explicit advertised API refresh", () => {
+  it("updates capabilities on site-info refresh without changing the account", async () => {
+    const c = await client();
+    mockFetch.mockResolvedValueOnce(
+      mockOkJson({
+        userid: c.userId,
+        sitename: "School",
+        release: "4.5",
+        functions: [
+          {
+            name: "core_completion_get_course_completion_status",
+            version: "1",
+          },
+        ],
+      }),
+    );
+    await c.refreshSiteInfo();
+    expect(c.supports("core_completion_get_course_completion_status")).toBe(
+      true,
+    );
+  });
+  it("does not silently change identity while refreshing", async () => {
+    const c = await client();
+    const original = c.userId;
+    mockFetch.mockResolvedValueOnce(
+      mockOkJson({
+        userid: original + 1,
+        sitename: "Other",
+        release: "4.5",
+        functions: [],
+      }),
+    );
+    await expect(c.refreshSiteInfo()).rejects.toThrow(/identity changed/);
+    expect(c.userId).toBe(original);
+  });
+});

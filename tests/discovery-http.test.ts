@@ -1,3 +1,4 @@
+import { TOOL_FUNCTIONS } from "../src/tool-policy.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app.js";
@@ -70,7 +71,9 @@ describe("authenticated HTTP discovery during Moodle outage", () => {
     expect(init.body.result.capabilities.tools).toBeDefined();
     const list = await post("tools/list", {});
     expect(list.status, list.text).toBe(200);
-    expect(list.body.result.tools).toHaveLength(15);
+    expect(list.body.result.tools).toHaveLength(
+      Object.keys(TOOL_FUNCTIONS).length,
+    );
     for (const tool of list.body.result.tools) {
       expect(tool).not.toHaveProperty("execution");
       expect(tool.inputSchema.type).toBe("object");
@@ -91,6 +94,8 @@ describe("authenticated HTTP discovery during Moodle outage", () => {
     expect(call.status, call.text).toBe(200);
     expect(call.body.result.isError).toBe(true);
     expect(call.text).not.toContain("DO-NOT-DISCLOSE");
-    expect((await post("tools/list", {})).body.result.tools).toHaveLength(15);
+    expect((await post("tools/list", {})).body.result.tools).toHaveLength(
+      Object.keys(TOOL_FUNCTIONS).length,
+    );
   });
 });

@@ -63,3 +63,14 @@ password, exact Origin, JSON, CSRF and explicit acknowledgement, then validates
 only on the configured Moodle host and requires account confirmation. The pinned
 account and encrypted candidate/race controls remain enforced. It is never invoked
 automatically after an invalid/expired SSO return. See `docs/COPIED-LINK-IMPORT.md`.
+
+### Student progress and Attendance reads
+
+Completion and submission readers bind user identity to the authenticated Moodle
+account; they do not accept arbitrary user IDs. The Attendance reader rechecks
+visible course modules and selected instance context, and removes every other
+student's log and user details from its output. It does not invoke attendance
+marking, QR/password workflows, or `tool_mobile_get_content`: the plugin mobile
+view can auto-assign a status as a side effect. Missing/denied API access remains
+explicitly unknown/unavailable, not absent or incomplete. Upstream diagnostic
+messages are not reflected in the new structured-read error envelope.

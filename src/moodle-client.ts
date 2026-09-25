@@ -1,3 +1,4 @@
+import { MoodleApiError } from "./moodle-errors.js";
 import { boundedBytes, fetchWithoutRedirect } from "./http.js";
 import type { Config } from "./config.js";
 import { FileIdStore } from "./file-id-store.js";
@@ -63,17 +64,24 @@ export class MoodleClient {
         config.password!,
       ));
     const client = new MoodleClient(config.baseUrl, token, config.maxFileBytes);
-    const info = await client.call<SiteInfo>("core_webservice_get_site_info");
+    await client.refreshSiteInfo();
+    return client;
+  }
+
+  /** Explicitly refresh the advertised APIs without changing the configured account. */
+  async refreshSiteInfo(): Promise<void> {
+    const info = await this.call<SiteInfo>("core_webservice_get_site_info");
     if (!Number.isSafeInteger(info.userid) || info.userid <= 0)
       throw new Error("Moodle did not return a valid user ID");
-    client.profile = info;
-    client.userId = info.userid;
-    client.siteName = info.sitename;
-    client.release = info.release ?? "";
-    client.supportedFunctions = new Set(
-      info.functions?.map((f) => f.name) ?? [],
-    );
-    return client;
+    if (this.userId !== 0 && info.userid !== this.userId)
+      throw new Error(
+        "Moodle account identity changed; reconnect the intended account.",
+      );
+    this.profile = info;
+    this.userId = info.userid;
+    this.siteName = info.sitename;
+    this.release = info.release ?? "";
+    this.supportedFunctions = new Set(info.functions?.map((f) => f.name) ?? []);
   }
 
   private static async login(
@@ -146,17 +154,22 @@ export class MoodleClient {
     ) as T & Partial<MoodleErrorResponse>;
     if (data && typeof data === "object" && data.exception) {
       if (data.errorcode === "webservicesnotenabled") {
-        throw new Error(
+        throw new MoodleApiError(
+          "webservicesnotenabled",
           "Web services are not enabled on this Moodle server. Contact your IT department to enable them.",
         );
       }
       if (data.errorcode === "invalidtoken") {
-        throw new Error("Invalid Moodle token. Check your MOODLE_TOKEN value.");
+        throw new MoodleApiError(
+          "invalidtoken",
+          "Invalid Moodle token. Check your MOODLE_TOKEN value.",
+        );
       }
       const message = String(data.message ?? "No message")
         .split(this.token)
         .join("[REDACTED]");
-      throw new Error(
+      throw new MoodleApiError(
+        data.errorcode ?? "unknown",
         `Moodle API error (${data.errorcode ?? "unknown"}): ${message}`,
       );
     }

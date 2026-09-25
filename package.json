@@ -1,6 +1,6 @@
 {
   "name": "@yusoofsh/moodle-mcp",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Read-only Moodle MCP with password OAuth for Cloudflare Workers Free and OCI",
   "type": "module",
   "bin": {

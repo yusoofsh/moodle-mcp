@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "moodle-mcp",
   "display_name": "Moodle MCP",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Give Claude access to your Moodle courses, assignments, grades, quizzes, calendar, forums, and notifications.",
   "long_description": "Moodle MCP connects Claude to any Moodle LMS instance. Ask about upcoming deadlines, check your grades, browse course resources, read assignment feedback, and more — all in natural language.\n\nSupports token-based auth (recommended) or username/password login.",
   "author": {
@@ -60,6 +60,10 @@
     }
   },
   "tools": [
+    { "name": "moodle_download_file", "description": "Download a currently visible course file using its opaque fileId" },
+    { "name": "moodle_get_activity_completion", "description": "Read current student activity completion and scoped progress without marking completion" },
+    { "name": "moodle_get_course_completion", "description": "Read current student course completion and criteria, distinguishing unavailable from incomplete" },
+    { "name": "moodle_get_attendance", "description": "Read visible Attendance inventory and permitted self-only session records without marking attendance" },
     { "name": "moodle_get_site_info", "description": "Get information about your Moodle server and account" },
     { "name": "moodle_list_courses", "description": "List all Moodle courses you are enrolled in" },
     { "name": "moodle_get_course", "description": "Get sections and modules of a specific course" },
@@ -78,7 +82,7 @@
   "compatibility": {
     "platforms": ["darwin", "win32"],
     "runtimes": {
-      "node": ">=18.0.0"
+      "node": ">=24.0.0"
     }
   }
 }

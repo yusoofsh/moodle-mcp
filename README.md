@@ -2,11 +2,11 @@
 
 ## Cloudflare Workers Free — 0.5.0
 
-The password/OAuth application can now run in a SQLite-backed Durable Object without Docker or a VPS. See [the Workers deployment and migration guide](docs/CLOUDFLARE.md). All 15 read-only Moodle tools remain, subject to Moodle permissions and Worker-specific limits. Generate a compatible hash with `bun run password:hash --workers`. Container support below is retained.
+The password/OAuth application can now run in a SQLite-backed Durable Object without Docker or a VPS. See [the Workers deployment and migration guide](docs/CLOUDFLARE.md). All 18 read-only Moodle tools remain, subject to Moodle permissions and Worker-specific limits. Generate a compatible hash with `bun run password:hash --workers`. Container support below is retained.
 
 Read-only access to your Moodle account from ChatGPT or another MCP client, without installing a Moodle plugin. This MIT-licensed fork of [1alexandrer/moodle-mcp](https://github.com/1alexandrer/moodle-mcp) adds a container-hosted OAuth authorization server and hardens remote access.
 
-**Current scope:** single Moodle account, one password-authenticated owner (or an explicitly selected GitHub owner), 15 student-facing tools. This is an OAuth/OCI foundation release, not complete Moodle API coverage. [Triage and follow-up work](docs/TRIAGE.md) · [Review record](docs/REVIEW.md) · [Security model](SECURITY.md).
+**Current scope:** single Moodle account, one password-authenticated owner (or an explicitly selected GitHub owner), 18 student-facing tools. This is an OAuth/OCI foundation release, not complete Moodle API coverage. [Triage and follow-up work](docs/TRIAGE.md) · [Review record](docs/REVIEW.md) · [Security model](SECURITY.md).
 
 ## Architecture
 
@@ -120,7 +120,7 @@ Password attempts are limited to **5 per IP per 15 minutes** and **30 total per 
 
 ## Available tools
 
-Authenticated HTTP/Workers discovery returns a stable catalog of 15 read-only tools without contacting Moodle. The connection and required web-service capabilities are checked when each tool runs, so a university outage or invalid Moodle token cannot hide the tool list. `moodle_get_site_info` reports availability for the configured token. Already-connected stdio clients still filter the list by reported capabilities. Advertising a tool never grants Moodle permissions.
+Authenticated HTTP/Workers discovery returns a stable catalog of 18 read-only tools without contacting Moodle. The connection and required web-service capabilities are checked when each tool runs, so a university outage or invalid Moodle token cannot hide the tool list. `moodle_get_site_info` reports availability for the configured token. Already-connected stdio clients still filter the list by reported capabilities. Advertising a tool never grants Moodle permissions.
 
 | Tool                                                 | Function                                                        |
 | ---------------------------------------------------- | --------------------------------------------------------------- |
@@ -190,3 +190,29 @@ equivalent JSON text/structured result. For a course known to the client, supply
 This returns the destination configured by the teacher; it does not fetch that
 site, follow redirects, transcribe videos, or send Moodle credentials downstream.
 Use only `resolved: true` targets for a separate permitted transcription workflow.
+
+## Student read correctness and progress (0.8.0)
+
+Assignments now join Moodle 4.5 `cmid` correctly, keep the requested course scoped,
+and expose distinct assignment IDs, UTC due dates, individual extension/status
+and released grade feedback. Missing results are not interpreted as no deadline,
+not submitted, ungraded, or absent.
+
+New read-only tools:
+
+| Tool                             | Purpose                                                                                           |
+| -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `moodle_get_activity_completion` | Current student activity completion, rules and a visible-activity progress summary                |
+| `moodle_get_course_completion`   | Moodle's separate course-completion decision and criteria                                         |
+| `moodle_get_attendance`          | Visible Attendance inventory; optionally attempt permitted self-only session reads for one module |
+
+Eight student-read tools now provide declared per-tool JSON output schemas, a
+versioned result envelope, warnings and readable text. Lists support bounded local
+`offset`/`limit` pagination. Site info reports a versioned backend catalog and the
+actual advertised Attendance API names; this does not overwrite a connector's
+cached tool registry or claim role/context permission.
+
+**Attendance is not auto-marked.** The plugin's mobile view handler can record
+presence merely when viewed, so that handler is intentionally never used. An
+unavailable or staff-only sessions API is reported, not bypassed. See
+[Student read P0 scope and validation](docs/STUDENT-READ-P0.md).

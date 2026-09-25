@@ -1,3 +1,4 @@
+import { registerStudentTools } from "./tools/student.js";
 import { registerUrlTools } from "./tools/urls.js";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClientSource } from "./moodle-source.js";
@@ -26,5 +27,6 @@ export function registerAllTools(
   registerQuizTools(server, client);
   registerForumTools(server, client);
   registerNotificationTools(server, client);
+  registerStudentTools(server, client);
   registerSiteInfoTool(server, client);
 }

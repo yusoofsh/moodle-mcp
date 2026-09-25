@@ -71,3 +71,17 @@ CSRF, replay, expiry, cancellation races and restart behavior have regression te
 Chromium/Firefox validate the setup page with a synthetic return; the institution
 may force its official app scheme. Real Google/SiberMu callback acceptance remains
 a user-side check rather than a claimed automated test.
+
+## 0.8.0 — first student-read correctness increment
+
+Implemented: assignment `cmid` mapping and self status; explicit unknown states,
+per-tool JSON schemas for eight reads; activity/course completion; Attendance
+inventory and permission-checked selected-instance reads; versioned catalog and
+manifest consistency tests. See [scope and validation](STUDENT-READ-P0.md).
+
+Still pending: end-to-end binary delivery / bounded PDF and DOCX extraction,
+deep Page/Book/forum content, aggregate dashboard/timeline, migration of remaining
+legacy outputs, and client-side registry refresh. Student write flows, teacher
+and admin operations remain separate, unimplemented scope. Attendance student
+read parity depends on the installed plugin's authorized API; no automatic
+mobile view fallback is allowed because it can change attendance.

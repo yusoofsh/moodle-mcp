@@ -10,7 +10,10 @@ import { gzipSync } from "node:zlib";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { hashPassword } from "../dist/auth/password.js";
-import { TOOL_FUNCTIONS } from "../dist/tool-policy.js";
+import {
+  TOOL_FUNCTIONS,
+  TOOL_OPTIONAL_FUNCTIONS,
+} from "../dist/tool-policy.js";
 
 const ORIGIN = "http://localhost:3000";
 const browserMode = process.argv.includes("--browser");
@@ -18,6 +21,8 @@ const REDIRECT = "https://client.example/callback";
 const PASSWORD = "workers test passphrase only";
 const storage = await mkdtemp(join(tmpdir(), "moodle-workerd-"));
 let upstreamMode = "ok";
+let studentMode = "ok";
+const invokedFunctions = [];
 let calls = 0,
   mf;
 const bindings = {
@@ -51,6 +56,7 @@ async function start(override = {}) {
         });
       const params = new URLSearchParams(await request.text());
       assert.equal(params.get("wstoken"), bindings.MOODLE_TOKEN);
+      invokedFunctions.push(params.get("wsfunction"));
       switch (params.get("wsfunction")) {
         case "core_webservice_get_site_info":
           return Response.json({
@@ -63,6 +69,7 @@ async function start(override = {}) {
               : [
                   ...new Set([
                     ...Object.values(TOOL_FUNCTIONS).flat(),
+                    ...Object.values(TOOL_OPTIONAL_FUNCTIONS).flat(),
                     "mod_url_get_urls_by_courses",
                     "core_course_get_course_module",
                   ]),
@@ -79,6 +86,28 @@ async function start(override = {}) {
               id: 1,
               name: "Recordings",
               modules: [
+                {
+                  id: 301,
+                  instance: 401,
+                  name: "Essay",
+                  modname: "assign",
+                  uservisible: true,
+                  completion: 2,
+                  completiondata: { state: 0, istrackeduser: true },
+                },
+                {
+                  id: 302,
+                  instance: 402,
+                  name: "Attendance",
+                  modname: "attendance",
+                  uservisible: true,
+                  completion: 1,
+                  completiondata: {
+                    state: 3,
+                    istrackeduser: true,
+                    isoverallcomplete: false,
+                  },
+                },
                 {
                   id: 201,
                   instance: 61,
@@ -117,6 +146,115 @@ async function start(override = {}) {
             ],
             warnings: [],
           });
+        case "mod_assign_get_assignments":
+          assert.equal(params.get("courseids[0]"), "7");
+          return Response.json({
+            courses: [
+              {
+                id: 7,
+                assignments: [
+                  {
+                    id: 401,
+                    cmid: 301,
+                    course: 7,
+                    name: "Essay",
+                    duedate: 1800000000,
+                    allowsubmissionsfromdate: 0,
+                    cutoffdate: 1800086400,
+                    grade: 100,
+                    nosubmissions: 0,
+                  },
+                ],
+              },
+            ],
+            warnings: [],
+          });
+        case "mod_assign_get_submission_status":
+          assert.equal(params.get("assignid"), "401");
+          assert.equal(params.get("userid"), "42");
+          return Response.json({
+            lastattempt: {
+              submission: {
+                userid: 42,
+                status: "submitted",
+                timemodified: 1790000000,
+              },
+              graded: true,
+              submissionsenabled: true,
+              extensionduedate: 1800200000,
+            },
+            feedback: {
+              grade: { grade: "0.00000" },
+              gradefordisplay: "0 / 100",
+            },
+            warnings: [],
+          });
+        case "core_completion_get_activities_completion_status":
+          assert.equal(params.get("courseid"), "7");
+          assert.equal(params.get("userid"), "42");
+          return Response.json({
+            statuses: [
+              {
+                cmid: 301,
+                instance: 401,
+                modname: "assign",
+                tracking: 2,
+                state: 2,
+                istrackeduser: true,
+                isoverallcomplete: true,
+              },
+              {
+                cmid: 302,
+                instance: 402,
+                modname: "attendance",
+                tracking: 1,
+                state: 3,
+                istrackeduser: true,
+                isoverallcomplete: false,
+              },
+            ],
+            warnings: [],
+          });
+        case "core_completion_get_course_completion_status":
+          assert.equal(params.get("courseid"), "7");
+          assert.equal(params.get("userid"), "42");
+          if (studentMode === "unconfigured")
+            return Response.json({
+              exception: "moodle_exception",
+              errorcode: "nocriteriaset",
+              message: "private-upstream-diagnostic",
+            });
+          return Response.json({
+            completionstatus: {
+              completed: false,
+              aggregation: 1,
+              completions: [],
+            },
+            warnings: [],
+          });
+        case "mod_attendance_get_sessions":
+          assert.equal(params.get("attendanceid"), "402");
+          if (studentMode === "denied")
+            return Response.json({
+              exception: "required_capability_exception",
+              errorcode: "nopermissions",
+              message: "private-upstream-diagnostic",
+            });
+          return Response.json([
+            {
+              id: 501,
+              attendanceid: 402,
+              courseid: 7,
+              sessdate: 1790000000,
+              duration: 3600,
+              statuses: [{ id: 1, description: "Present" }],
+              users: [{ id: 42 }, { id: 99, firstname: "PRIVATE-OTHER" }],
+              attendance_log: [
+                { studentid: 42, statusid: "1", remarks: "On time" },
+                { studentid: 99, statusid: "1", remarks: "PRIVATE-OTHER" },
+              ],
+            },
+          ]);
         case "core_enrol_get_users_courses":
           return Response.json([
             { id: 7, fullname: "Sample course", shortname: "TEST" },
@@ -373,7 +511,7 @@ try {
     assert.equal((await exchange(id, replay)).status, 400);
   });
   await check(
-    "MCP initialize, all 15 read-only tools, Moodle request",
+    "MCP initialize, all 18 read-only tools, Moodle request",
     async () => {
       const init = await rpc(granted.access_token, "initialize", {
         protocolVersion: "2025-11-25",
@@ -383,7 +521,10 @@ try {
       assert.equal(init.status, 200, init.text);
       const tools = await rpc(granted.access_token, "tools/list", {});
       assert.equal(tools.status, 200, tools.text);
-      assert.equal(tools.json.result.tools.length, 15);
+      assert.equal(
+        tools.json.result.tools.length,
+        Object.keys(TOOL_FUNCTIONS).length,
+      );
       assert.ok(
         tools.json.result.tools.every((t) => t.annotations.readOnlyHint),
       );
@@ -437,6 +578,118 @@ try {
     },
   );
   await check(
+    "assignment cmid mapping, structured parity and current-student status",
+    async () => {
+      const listing = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_list_assignments",
+        arguments: { courseId: 7 },
+      });
+      assert.equal(listing.status, 200, listing.text);
+      assert.notEqual(listing.json.result.isError, true, listing.text);
+      const result = listing.json.result.structuredContent;
+      assert.equal(result.schemaVersion, 1);
+      assert.equal(result.data.items[0].assignmentId, 401);
+      assert.equal(result.data.items[0].cmid, 301);
+      assert.equal(result.data.items[0].dueDate, 1800000000);
+      assert.deepEqual(JSON.parse(listing.json.result.content[0].text), result);
+      const status = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_assignment",
+        arguments: { assignmentId: 401 },
+      });
+      assert.equal(
+        status.json.result.structuredContent.data.submissionStatus,
+        "submitted",
+      );
+      assert.equal(
+        status.json.result.structuredContent.data.feedback.grade,
+        "0.00000",
+      );
+    },
+  );
+  await check(
+    "completion distinguishes completed, failed, unconfigured and hidden",
+    async () => {
+      const activities = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_activity_completion",
+        arguments: { courseId: 7 },
+      });
+      assert.equal(
+        activities.json.result.structuredContent.data.summary.completed,
+        1,
+      );
+      assert.equal(
+        activities.json.result.structuredContent.data.summary.failed,
+        1,
+      );
+      assert.ok(!activities.text.includes("Hidden recording"));
+      studentMode = "unconfigured";
+      const course = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_course_completion",
+        arguments: { courseId: 7 },
+      });
+      assert.equal(course.json.result.structuredContent.data.completed, null);
+      assert.equal(
+        course.json.result.structuredContent.capabilities.courseCompletion,
+        "not_configured",
+      );
+      assert.ok(!course.text.includes("private-upstream-diagnostic"));
+      studentMode = "ok";
+    },
+  );
+  await check(
+    "Attendance inventory, self-only logs, permission denial, no auto-marking",
+    async () => {
+      const start = invokedFunctions.length;
+      const inventory = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_attendance",
+        arguments: { courseId: 7 },
+      });
+      assert.equal(
+        inventory.json.result.structuredContent.data.activities.length,
+        1,
+      );
+      assert.equal(inventory.json.result.structuredContent.data.sessions, null);
+      assert.ok(
+        !invokedFunctions.slice(start).includes("mod_attendance_get_sessions"),
+      );
+      const details = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_attendance",
+        arguments: { courseId: 7, moduleId: 302 },
+      });
+      assert.equal(
+        details.json.result.structuredContent.data.sessions[0].statusLabel,
+        "Present",
+      );
+      assert.ok(!details.text.includes("PRIVATE-OTHER"));
+      studentMode = "denied";
+      const denied = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_attendance",
+        arguments: { courseId: 7, moduleId: 302 },
+      });
+      assert.equal(
+        denied.json.result.structuredContent.capabilities.attendanceSessions,
+        "forbidden",
+      );
+      assert.equal(denied.json.result.structuredContent.data.sessions, null);
+      studentMode = "ok";
+      assert.ok(
+        !invokedFunctions.some(
+          (fn) =>
+            fn === "tool_mobile_get_content" ||
+            /mark|update|submit|save|set_/.test(fn),
+        ),
+      );
+      const info = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_site_info",
+        arguments: {},
+      });
+      assert.equal(
+        info.json.result.structuredContent.data.catalog.toolCount,
+        Object.keys(TOOL_FUNCTIONS).length,
+      );
+    },
+  );
+  await check(
     "authenticated discovery survives Moodle failure and recovers on retry",
     async () => {
       await mf.dispose();
@@ -460,7 +713,10 @@ try {
       }
       const listing = await rpc(granted.access_token, "tools/list", {});
       assert.equal(listing.status, 200, listing.text);
-      assert.equal(listing.json.result.tools.length, 15);
+      assert.equal(
+        listing.json.result.tools.length,
+        Object.keys(TOOL_FUNCTIONS).length,
+      );
       for (const tool of listing.json.result.tools) {
         assert.ok(
           !Object.hasOwn(tool, "execution"),
@@ -512,7 +768,7 @@ try {
       try {
         await sdkClient.connect(transport);
         const listing = await sdkClient.listTools();
-        assert.equal(listing.tools.length, 15);
+        assert.equal(listing.tools.length, Object.keys(TOOL_FUNCTIONS).length);
         const result = await sdkClient.callTool({
           name: "moodle_list_courses",
           arguments: {},
@@ -532,7 +788,10 @@ try {
       await start();
       const listing = await rpc(granted.access_token, "tools/list", {});
       assert.equal(listing.status, 200);
-      assert.equal(listing.json.result.tools.length, 15);
+      assert.equal(
+        listing.json.result.tools.length,
+        Object.keys(TOOL_FUNCTIONS).length,
+      );
       const denied = await rpc(granted.access_token, "tools/call", {
         name: "moodle_list_courses",
         arguments: {},
@@ -546,7 +805,10 @@ try {
       });
       assert.equal(info.status, 200);
       assert.notEqual(info.json.result.isError, true);
-      assert.match(info.text, /Not advertised by token/);
+      assert.equal(
+        info.json.result.structuredContent.capabilities.activityCompletion,
+        "not_advertised",
+      );
       await mf.dispose();
       upstreamMode = "ok";
       await start();
@@ -557,7 +819,10 @@ try {
     await start();
     const result = await rpc(granted.access_token, "tools/list", {});
     assert.equal(result.status, 200, result.text);
-    assert.equal(result.json.result.tools.length, 15);
+    assert.equal(
+      result.json.result.tools.length,
+      Object.keys(TOOL_FUNCTIONS).length,
+    );
   });
   await check("refresh rotation and replay family revocation", async () => {
     const refresh = (value) =>
