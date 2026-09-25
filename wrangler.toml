@@ -6,7 +6,7 @@ workers_dev = true
 minify = true
 
 [vars]
-PUBLIC_URL = "https://moodle.yusoofsh.workers.dev"
+PUBLIC_URL = "https://moodle.yusoofsh.id"
 MOODLE_MCP_MAX_FILE_MB = "2"
 
 # Internal binding/class identifiers must match src/worker.ts. The public Worker
