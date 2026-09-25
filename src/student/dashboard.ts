@@ -51,6 +51,16 @@ const eventsSchema = z.object({
   firstid: z.number().int().nullish(),
   lastid: z.number().int().nullish(),
 });
+const groupedEventsSchema = z.object({
+  groupedbycourse: z.array(
+    z.object({
+      courseid: idSchema,
+      events: z.array(eventSchema),
+      firstid: z.number().int().nullish(),
+      lastid: z.number().int().nullish(),
+    }),
+  ),
+});
 export interface CalendarOptions {
   courseId?: number;
   daysAhead?: number;
@@ -110,8 +120,92 @@ export async function readCalendar(
     params.userid = client.userId;
     params.limittononsuspendedevents = true;
   }
-  const r = await readApi(client, api, params, eventsSchema);
-  const raw = r.value?.events ?? null;
+  const primary = await readApi(client, api, params, eventsSchema);
+  let raw = primary.value?.events ?? null,
+    state = primary.state,
+    fallbackUsed = false,
+    fallbackMayHaveMore = false;
+  const warnings = [...primary.warnings];
+
+  // Some Moodle deployments advertise the per-user action endpoint but deny it
+  // to ordinary students. Fall back to the grouped enrolled-course reader,
+  // which still applies Moodle's own enrolment/visibility checks. This fallback
+  // is intentionally unavailable for an afterEventId cursor because that API
+  // has no equivalent cursor parameter.
+  if (
+    options.courseId === undefined &&
+    after === 0 &&
+    state !== "available" &&
+    client.supports("core_calendar_get_action_events_by_courses")
+  ) {
+    const enrolled = await readCourses(client, { limit: 50 });
+    warnings.push(...enrolled.warnings);
+    const courseIds = enrolled.data.items?.map((c) => c.courseId) ?? null;
+    if (courseIds !== null && courseIds.length > 0) {
+      const perCourseLimit = Math.max(1, Math.floor(limit / courseIds.length));
+      const groupedParams: Record<string, string | number | boolean> = {
+        timesortfrom: from,
+        timesortto: to,
+        limitnum: perCourseLimit,
+      };
+      courseIds.forEach((courseId, index) => {
+        groupedParams[`courseids[${index}]`] = courseId;
+      });
+      const fallback = await readApi(
+        client,
+        "core_calendar_get_action_events_by_courses",
+        groupedParams,
+        groupedEventsSchema,
+      );
+      warnings.push(...fallback.warnings);
+      if (fallback.value) {
+        const allowed = new Set(courseIds);
+        const groups = fallback.value.groupedbycourse.filter((group) =>
+          allowed.has(group.courseid),
+        );
+        if (groups.length !== fallback.value.groupedbycourse.length)
+          warnings.push(
+            warning(
+              "EVENT_CONTEXT_MISMATCH",
+              "Events for courses outside the authenticated enrolment list were withheld.",
+              "core_calendar_get_action_events_by_courses",
+            ),
+          );
+        const groupedEvents = groups.flatMap((group) =>
+          group.events
+            .filter(
+              (event) =>
+                (event.course?.id ?? event.courseid ?? group.courseid) ===
+                group.courseid,
+            )
+            .map((event) => ({
+              ...event,
+              courseid: event.courseid ?? group.courseid,
+            })),
+        );
+        groupedEvents.sort(
+          (a, b) =>
+            (a.timesort ?? a.timestart) - (b.timesort ?? b.timestart) ||
+            a.id - b.id,
+        );
+        fallbackMayHaveMore =
+          enrolled.pagination?.nextOffset !== null ||
+          groups.some((group) => group.events.length >= perCourseLimit) ||
+          groupedEvents.length > limit;
+        raw = groupedEvents.slice(0, limit);
+        state = fallback.state;
+        fallbackUsed = true;
+        warnings.push(
+          warning(
+            "CALENDAR_GROUPED_FALLBACK",
+            "The per-user action endpoint was unavailable, so the timeline used bounded action events from the authenticated student's enrolled courses. User/site events may be absent.",
+            "core_calendar_get_action_events_by_courses",
+          ),
+        );
+      }
+    }
+  }
+
   const filtered =
     raw?.filter(
       (e) =>
@@ -119,7 +213,7 @@ export async function readCalendar(
         (e.course?.id ?? e.courseid) === options.courseId,
     ) ?? null;
   if (raw && filtered && raw.length !== filtered.length)
-    r.warnings.push(
+    warnings.push(
       warning(
         "EVENT_CONTEXT_MISMATCH",
         "Events outside the requested course were withheld.",
@@ -153,8 +247,14 @@ export async function readCalendar(
           }
         : null,
     })) ?? null;
-  const last = r.value?.lastid ?? raw?.at(-1)?.id ?? null;
-  const mayHaveMore = raw === null ? null : raw.length >= limit;
+  const last =
+    fallbackUsed ? null : (primary.value?.lastid ?? raw?.at(-1)?.id ?? null);
+  const mayHaveMore =
+    raw === null
+      ? null
+      : fallbackUsed
+        ? fallbackMayHaveMore
+        : raw.length >= limit;
   const data = {
     userId: client.userId,
     courseId: options.courseId ?? null,
@@ -165,31 +265,33 @@ export async function readCalendar(
     items,
     cursor: {
       mode: "upstream_event" as const,
-      afterEventId: mayHaveMore ? last : null,
+      afterEventId: fallbackUsed ? null : mayHaveMore ? last : null,
       mayHaveMore,
       limit,
     },
     complete:
+      !fallbackUsed &&
       after === 0 &&
-      r.state === "available" &&
+      state === "available" &&
       mayHaveMore === false &&
-      r.warnings.length === 0,
-    scope:
-      "Moodle action events, not the full personal/group/site calendar. A past opening event is not an overdue submission.",
+      warnings.length === 0,
+    scope: fallbackUsed
+      ? "Bounded enrolled-course action-event fallback. User/site events may be absent and grouped results have no afterEventId cursor."
+      : "Moodle action events, not the full personal/group/site calendar. A past opening event is not an overdue submission.",
   };
   return packet(
     data,
     `## Action timeline\n` +
       (items === null
-        ? "Timeline unavailable (" + r.state + "); not proof of no deadlines."
+        ? "Timeline unavailable (" + state + "); not proof of no deadlines."
         : items
             .map(
               (e) =>
                 `- ${e.name} — ${e.startDateIso ?? "date unknown"} (${e.eventType ?? "unknown"}, ${e.timing})`,
             )
             .join("\n")),
-    { calendar: r.state },
-    r.warnings,
+    { calendar: state },
+    warnings,
   );
 }
 export interface DashboardOptions {
