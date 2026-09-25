@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { build } from "esbuild";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { zipSync, strToU8 } from "fflate";
-const dir = await mkdtemp(join(tmpdir(), "moodle-documents-"));
+const root = join(process.cwd(), ".wrangler");
+await mkdir(root, { recursive: true });
+const dir = await mkdtemp(join(root, "document-parser-"));
 function pdf(text) {
   const stream = `BT /F1 12 Tf 72 720 Td (${text}) Tj ET`;
   const objects = [
@@ -42,6 +43,7 @@ try {
       name: "document-parser-test",
       modules: true,
       scriptPath: path,
+      modulesRoot: dir,
       compatibilityDate: "2026-09-23",
       compatibilityFlags: ["nodejs_compat", "global_fetch_strictly_public"],
       outboundService: async () => {
@@ -67,6 +69,16 @@ try {
       }),
       expected: "Verified DOCX text inside workerd",
     },
+    {
+      filename: "test.pptx",
+      mime: "application/zip",
+      bytes: zipSync({
+        "ppt/presentation.xml": strToU8('<p:presentation xmlns:p="p" xmlns:r="r"><p:sldIdLst><p:sldId id="1" r:id="rId1"/></p:sldIdLst></p:presentation>'),
+        "ppt/_rels/presentation.xml.rels": strToU8('<Relationships><Relationship Id="rId1" Target="slides/slide1.xml"/></Relationships>'),
+        "ppt/slides/slide1.xml": strToU8('<p:sld xmlns:p="p" xmlns:a="a"><a:p><a:r><a:t>Verified PPTX text inside workerd</a:t></a:r></a:p></p:sld>'),
+      }),
+      expected: "Verified PPTX text inside workerd",
+    },
   ];
   for (const c of cases) {
     const response = await mf.dispatchFetch("https://documents.test/", {
@@ -78,8 +90,9 @@ try {
         mime: c.mime,
       }),
     });
-    const data = await response.json();
-    assert.equal(response.status, 200, JSON.stringify(data));
+    const body = await response.text();
+    assert.equal(response.status, 200, body.slice(0, 1000));
+    const data = JSON.parse(body);
     assert.equal(data.status, "extracted");
     assert.ok(data.text.includes(c.expected), data.text);
     console.log("PASS workerd document parser:", c.filename);
