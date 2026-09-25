@@ -1,3 +1,4 @@
+import { coverageSummarySchema } from "./coverage-summary.js";
 import { z } from "zod";
 import { idSchema, readOutputSchema, readStates } from "./result.js";
 const n = z.number().nullable(),
@@ -206,6 +207,7 @@ export const studentOutputs = {
       userId: idSchema,
       reportedFunctionCount: n,
       advertisedFunctions: z.array(z.string()),
+      apiCoverage: coverageSummarySchema,
       catalog: z.object({
         version: z.string(),
         toolCount: z.number(),
