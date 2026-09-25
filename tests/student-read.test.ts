@@ -583,3 +583,22 @@ describe("read-contract edge cases and catalog alignment", () => {
     }
   });
 });
+
+describe("Moodle nullable submission renderables", () => {
+  it.each(["extension", "feedback", "both"])(
+    "accepts documented null fields without discarding valid status: %s",
+    async (which) => {
+      if (which !== "feedback") submission.lastattempt.extensionduedate = null;
+      if (which !== "extension") {
+        submission.feedback.gradefordisplay = null;
+        submission.feedback.gradeddate = null;
+      }
+      const r = await readAssignmentStatus(client, 201);
+      expect(r.capabilities.submissionStatus).toBe("available");
+      expect(r.data.submissionStatus).toBe("submitted");
+      expect(r.data.graded).toBe(true);
+      expect(r.data.feedback?.grade).toBe("0.00000");
+      if (which !== "feedback") expect(r.data.extensionDueDate).toBeNull();
+    },
+  );
+});

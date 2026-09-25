@@ -178,14 +178,15 @@ const statusSchema = z.object({
       locked: flagSchema.optional(),
       canedit: flagSchema.optional(),
       cansubmit: flagSchema.optional(),
-      extensionduedate: z.number().int().optional(),
+      // Moodle initializes this to null until per-user flags exist.
+      extensionduedate: z.number().int().nullish(),
       gradingstatus: z.string().optional(),
     })
     .optional(),
   feedback: z
     .object({
-      gradefordisplay: z.string().optional(),
-      gradeddate: z.number().int().optional(),
+      gradefordisplay: z.string().nullish(),
+      gradeddate: z.number().int().nullish(),
       grade: z
         .object({
           grade: z.string().optional(),

@@ -35,7 +35,7 @@ export const TOOL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_get_attendance: ["core_course_get_contents"],
   moodle_get_notifications: ["message_popup_get_popup_notifications"],
 };
-export const TOOL_CATALOG_VERSION = "0.8.0";
+export const TOOL_CATALOG_VERSION = "0.8.1";
 export const TOOL_OPTIONAL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_list_assignments: ["mod_assign_get_assignments"],
   moodle_get_activity_completion: [

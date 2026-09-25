@@ -181,7 +181,7 @@ async function start(override = {}) {
               },
               graded: true,
               submissionsenabled: true,
-              extensionduedate: 1800200000,
+              extensionduedate: null,
             },
             feedback: {
               grade: { grade: "0.00000" },

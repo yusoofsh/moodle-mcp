@@ -1,4 +1,4 @@
-# Student read correctness, completion and Attendance (0.8.0)
+# Student read correctness, completion and Attendance (0.8.1)
 
 Baseline: `ef150cb69515478a4eb109de023c378aaf121b17`. This release implements the
 first P0 student-read increment. It is not student-complete, does not enable any
@@ -151,3 +151,25 @@ grant, binding name, migration history, university setting or billing is changed
   `course/externallib.php`: current-user/context checks and completion structures.
 - `danmarsden/moodle-mod_attendance`, branch `MOODLE_405_STABLE`:
   `externallib.php`, `db/services.php`, `classes/output/mobile.php`.
+
+### Live acceptance and nullable submission correction (0.8.1)
+
+The first deployed increment returned all five AIK1 assignments with matching
+cmid/assignmentId, dates and no warnings, instead of five details-unavailable
+entries. Its current-student course read returned 80 visible modules and 15
+Attendance activities with structured completion fields. Site info confirmed both
+completion APIs are advertised, but no `mod_attendance_` functions are advertised
+by the current token. This does not establish the installed plugin version.
+
+A live self-submission read exposed an additional strict-schema failure. Official
+Moodle 4.5 `mod/assign/locallib.php`, `get_assign_submission_status_renderable`,
+initializes `extensionduedate` to null when no user flags exist; feedback rendering
+likewise permits null display/date fields. 0.8.1 accepts those documented nulls
+while keeping them unknown in output; invalid strings/identities are not coerced.
+Three new regression cases and the workerd self-status fixture cover this shape.
+Production workflow for 0.8.0 completed all SSO/import gates successfully; 0.8.1 is
+also required to pass the unchanged full test-gated deployment. No auth or secret
+changes are involved. Real final submission/attendance state changes are excluded.
+
+Final 0.8.1 local regression run: 262 tests across 21 files passed and 19
+non-browser workerd groups passed, including the nullable extension fixture.
