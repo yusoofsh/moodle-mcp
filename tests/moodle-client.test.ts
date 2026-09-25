@@ -162,3 +162,19 @@ describe("explicit advertised API refresh", () => {
     expect(c.userId).toBe(original);
   });
 });
+
+it("encodes Moodle PARAM_BOOL form values as 1 and 0, never true/false strings", async () => {
+  const c = await client();
+  mockFetch.mockResolvedValueOnce(mockOkJson({ ok: true }));
+  await c.call("synthetic_boolean_read", {
+    newestfirst: true,
+    includeprivate: false,
+    offset: 0,
+    label: "value",
+  });
+  const body = mockFetch.mock.calls.at(-1)![1].body as URLSearchParams;
+  expect(body.get("newestfirst")).toBe("1");
+  expect(body.get("includeprivate")).toBe("0");
+  expect(body.get("offset")).toBe("0");
+  expect(body.get("label")).toBe("value");
+});

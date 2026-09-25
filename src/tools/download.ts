@@ -26,7 +26,7 @@ export function registerDownloadTool(
       "moodle_download_file",
       {
         description:
-          "Read an authorized course file by its opaque fileId. Default auto mode now returns extracted PDF/DOCX/PPTX/plain text with explicit pagination, avoiding dropped binary resources in gateways. mode=raw retains embedded bytes for capable clients; no raw URL or Moodle token is returned. Max file size remains configured. Scans are not OCRed. Reuse startPage/charOffset for continuation.",
+          "Read an authorized course file by its opaque fileId. Default auto mode now returns extracted PDF/DOCX/PPTX/plain text with explicit pagination, avoiding dropped binary resources in gateways. mode=raw retains embedded bytes for capable clients; no raw URL or Moodle token is returned. Max file size remains configured. Scans are not OCRed. For cached fileId-only clients, pass the returned nextFileId unchanged to read the next window; explicit startPage/charOffset is available with the original fileId.",
         inputSchema: documentWindow
           .extend({
             fileId: fileIdSchema,
@@ -47,6 +47,10 @@ export function registerDownloadTool(
         const ref = await client.fileIdStore.open(fileId, client.userId);
         if (!ref || !(await reauthorize(client, ref)))
           throw new Error("File ID invalid, expired, or access denied.");
+        if (ref.documentCursor)
+          throw new Error(
+            "Raw mode requires the original fileId, not a document continuation.",
+          );
         const file = await client.downloadFile(ref.fileurl);
         const mime = file.mime || ref.mime;
         return {

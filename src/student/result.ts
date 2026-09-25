@@ -147,6 +147,7 @@ export function warning(
   return { code, message, ...(api ? { api } : {}), ...(cmid ? { cmid } : {}) };
 }
 const statesByCode: Record<string, ReadState> = {
+  nopermissiontoviewgrades: "forbidden",
   invalidtoken: "unauthenticated",
   expiredtoken: "unauthenticated",
   nopermissions: "forbidden",

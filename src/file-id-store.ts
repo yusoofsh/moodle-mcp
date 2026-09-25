@@ -1,7 +1,7 @@
 // Sealed opaque file IDs.
 //
 // Every fileId emitted by MCP tools is an AES-GCM envelope over the tuple
-// {userId, courseId, fileurl, mime, filename, filesize, exp}. The encryption
+// {userId, courseId, fileurl, mime, filename, filesize, documentCursor?, exp}. The encryption
 // key is HKDF-derived from the Moodle access token, so:
 //   - IDs are unforgeable without the token.
 //   - IDs carry no reversible data (no hex-encoded URL).
@@ -11,6 +11,15 @@
 // Identical implementation runs in Node (stdio) and the Cloudflare Worker;
 // Web Crypto is available globally in both.
 
+/** File-bound parser position, authenticated by the same opaque envelope. */
+export interface DocumentCursor {
+  version: 1;
+  startPage: number;
+  charOffset: number;
+  maxPages: number;
+  maxChars: number;
+  contentHash: string;
+}
 export interface FileRef {
   userId: number;
   courseId: number;
@@ -18,6 +27,7 @@ export interface FileRef {
   mime: string;
   filename: string;
   filesize: number;
+  documentCursor?: DocumentCursor;
 }
 
 interface SealedPayload extends FileRef {

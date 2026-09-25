@@ -380,6 +380,52 @@ async function start(override = {}) {
             firstid: 1201,
             lastid: 1201,
           });
+        case "message_popup_get_popup_notifications":
+          assert.equal(params.get("useridto"), "42");
+          assert.equal(
+            params.get("newestfirst"),
+            "1",
+            "Moodle PARAM_BOOL must use numeric form encoding",
+          );
+          return Response.json({
+            notifications: [
+              {
+                id: 901,
+                useridfrom: 55,
+                useridto: 42,
+                subject: "Released result",
+                text: "<p>Read-only notification body</p>",
+                timecreated: 1790000000,
+                timeread: 0,
+                read: false,
+                deleted: false,
+                contexturl: "https://moodle.example/grade/index.php",
+              },
+            ],
+            unreadcount: 1,
+          });
+        case "gradereport_user_get_grade_items":
+          assert.equal(params.get("courseid"), "7");
+          assert.equal(params.get("userid"), "42");
+          return Response.json({
+            usergrades: [
+              {
+                courseid: 7,
+                userid: 42,
+                gradeitems: [
+                  {
+                    id: 902,
+                    itemtype: "course",
+                    itemname: null,
+                    gradeformatted: "0.00",
+                    graderaw: 0,
+                    percentageformatted: "0 %",
+                  },
+                ],
+              },
+            ],
+            warnings: [],
+          });
         case "mod_assign_get_assignments":
           assert.equal(params.get("courseids[0]"), "7");
           return Response.json({
@@ -1045,11 +1091,67 @@ try {
         );
         assert.ok(!r.text.includes(bindings.MOODLE_TOKEN));
       }
+      const firstWindow = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_download_file",
+        arguments: { fileId, maxChars: 12 },
+      });
+      const firstData = firstWindow.json.result.structuredContent.data;
+      assert.equal(typeof firstData.nextFileId, "string");
+      const tail = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_download_file",
+        arguments: { fileId: firstData.nextFileId },
+      });
+      assert.notEqual(tail.json.result.isError, true, tail.text);
+      assert.equal(
+        tail.json.result.structuredContent.data.document.pages[0].charOffset,
+        12,
+      );
+      assert.equal(
+        tail.json.result.structuredContent.data.document.text.length,
+        12,
+      );
+      assert.ok(!tail.text.includes(bindings.MOODLE_TOKEN));
       const denied = await rpc(granted.access_token, "tools/call", {
         name: "moodle_read_document",
         arguments: { fileId: "f_not_issued" },
       });
       assert.equal(denied.json.result.isError, true);
+    },
+  );
+  await check(
+    "numeric boolean transport, read-only notifications and withheld grade ranges",
+    async () => {
+      const notifications = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_notifications",
+        arguments: { limit: 3 },
+      });
+      assert.notEqual(
+        notifications.json.result.isError,
+        true,
+        notifications.text,
+      );
+      assert.equal(
+        notifications.json.result.structuredContent.data.items[0].read,
+        false,
+      );
+      assert.equal(
+        notifications.json.result.structuredContent.data.readReceiptsChanged,
+        false,
+      );
+      const grades = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_get_grades",
+        arguments: { courseId: 7 },
+      });
+      assert.notEqual(grades.json.result.isError, true, grades.text);
+      assert.equal(
+        grades.json.result.structuredContent.data.courseTotal.raw,
+        0,
+      );
+      assert.equal(
+        grades.json.result.structuredContent.data.courseTotal.maximum,
+        null,
+      );
+      assert.ok(!grades.text.includes("undefined"));
     },
   );
   await check(
