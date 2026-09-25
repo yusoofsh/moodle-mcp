@@ -2,60 +2,32 @@ name: Verify student coverage development
 on:
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: coverage-development
   cancel-in-progress: false
 jobs:
   verify:
-    if: github.ref == 'refs/heads/feat/sibermu-api-coverage'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24'
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: '1.4.2'
-      - name: Persist reviewed contracts, reference metadata and manifest
-        run: |
-          bun install --ignore-scripts
-          node scripts/refine-coverage-contract.mjs
-          node scripts/finalize-reviewed-coverage.mjs
-          node scripts/add-document-transport-test.mjs
-          node scripts/generate-api-declarations.mjs
-          bun scripts/refresh-tool-manifest.ts
-          bun run format
-          git restore .github/workflows/publish.yml .github/workflows/workers-deploy.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add bun.lock manifest.json package.json src tests scripts README.md SECURITY.md docs
-          if ! git diff --cached --quiet; then
-            git commit -m 'chore: persist reviewed coverage extensions and regression tests'
-            git push origin HEAD:feat/sibermu-api-coverage
-          fi
       - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run format:check
       - run: bun run check && bun run test && bun run build
       - run: bun run workers:build
-      - run: node scripts/test-document-runtime.mjs
+      - name: Verify document parsing in workerd
+        if: hashFiles('scripts/test-document-runtime.mjs') != ''
+        run: node scripts/test-document-runtime.mjs
       - run: bunx --no-install playwright install --with-deps chromium firefox
       - run: bun run workers:test:browser
       - run: bun run workers:test:sso
       - run: bun audit
-      - name: Export credential-free review snapshot
-        if: always()
-        run: |
-          set -euo pipefail
-          node scripts/export-review-sources.mjs
-          git rev-parse HEAD > offline-review/project-revision.txt
-          tar -czf /tmp/moodle-source-review.tgz src tests scripts offline-review .github/workflows package.json manifest.json bun.lock tsconfig.json vitest.config.ts wrangler.toml README.md SECURITY.md docs compose.yaml
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: moodle-source-review
-          path: /tmp/moodle-source-review.tgz
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
