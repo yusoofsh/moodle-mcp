@@ -205,6 +205,7 @@ export const studentOutputs = {
       version: z.string(),
       userId: idSchema,
       reportedFunctionCount: n,
+      advertisedFunctions: z.array(z.string()),
       catalog: z.object({
         version: z.string(),
         toolCount: z.number(),

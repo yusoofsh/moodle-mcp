@@ -70,6 +70,7 @@ export function registerSiteInfoTool(
         school: client.siteName,
         version: client.release,
         userId: client.userId,
+        advertisedFunctions: [...functions].sort(),
         reportedFunctionCount:
           client.profile?.functions === undefined ? null : functions.size,
         catalog: {

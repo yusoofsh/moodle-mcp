@@ -157,7 +157,7 @@ export function createAppWithStore(
     return pending;
   };
   app.post("/mcp", express.json({ limit: "1mb" }), async (req, res) => {
-    const server = new McpServer({ name: "moodle-mcp", version: "0.9.1" });
+    const server = new McpServer({ name: "moodle-mcp", version: "0.9.2" });
     registerAllTools(server, getClient);
     registerResources(server, getClient);
     registerPrompts(server);
