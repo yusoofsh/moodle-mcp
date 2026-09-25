@@ -12,6 +12,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24'
@@ -22,6 +24,9 @@ jobs:
       - run: bun run format:check
       - run: bun run check && bun run test && bun run build
       - run: bun run workers:build
+      - name: Verify document parsing in workerd
+        if: hashFiles('scripts/test-document-runtime.mjs') != ''
+        run: node scripts/test-document-runtime.mjs
       - run: bunx --no-install playwright install --with-deps chromium firefox
       - run: bun run workers:test:browser
       - run: bun run workers:test:sso
