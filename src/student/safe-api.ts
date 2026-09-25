@@ -8,6 +8,7 @@ import {
   packet,
   warning,
   type ReadWarning,
+  type ReadPacket,
 } from "./result.js";
 
 type Args = Record<string, unknown>;
@@ -462,11 +463,29 @@ export function sanitizeApiResult(input: unknown, site: string) {
   };
 }
 
+export interface ReadOperationResult {
+  functionName: string;
+  scope: "self" | "course" | "module";
+  result: unknown;
+  complete: boolean;
+  responseComplete: boolean;
+  rawMetadata: boolean;
+  truncated: boolean;
+  redactedFields: number;
+  untrusted: boolean;
+  upstreamPagination: {
+    offset: number | null;
+    limit: number | null;
+    page: number | null;
+    mayHaveMore: boolean | null;
+  };
+  permissionVerified: boolean;
+}
 export async function invokeReadOperation(
   client: MoodleClient,
   functionName: string,
   parameters: Args = {},
-) {
+): Promise<ReadPacket<ReadOperationResult>> {
   if (!Object.hasOwn(READ_OPERATIONS, functionName))
     throw new Error(
       "This API is not in the reviewed read-only registry. Advertisement or a get-prefix does not authorize it.",
@@ -511,6 +530,15 @@ export async function invokeReadOperation(
           scope: spec.scope,
           result: null,
           complete: false,
+          responseComplete: false,
+          truncated: false,
+          upstreamPagination: {
+            offset: null,
+            limit: null,
+            page: null,
+            mayHaveMore: null,
+          },
+          permissionVerified: true,
           rawMetadata: true,
           redactedFields: 0,
           untrusted: true,
@@ -549,7 +577,7 @@ export async function invokeReadOperation(
       );
   }
   const sanitized = sanitizeApiResult(raw, client.siteUrl);
-  const complete =
+  const responseComplete =
     response.state === "available" &&
     !sanitized.truncated &&
     warnings.length === 0;
@@ -558,12 +586,18 @@ export async function invokeReadOperation(
       functionName,
       scope: spec.scope,
       ...sanitized,
-      complete,
+      complete:
+        responseComplete &&
+        !Object.keys(
+          spec.input instanceof z.ZodObject ? spec.input.shape : {},
+        ).some((key) => ["offset", "limit", "page"].includes(key)),
+      responseComplete,
       rawMetadata: true,
       upstreamPagination: {
-        offset: args.offset ?? null,
-        limit: args.limit ?? null,
-        page: args.page ?? null,
+        offset: typeof args.offset === "number" ? args.offset : null,
+        limit: typeof args.limit === "number" ? args.limit : null,
+        page: typeof args.page === "number" ? args.page : null,
+        mayHaveMore: null,
       },
       permissionVerified: response.state === "available",
     },
