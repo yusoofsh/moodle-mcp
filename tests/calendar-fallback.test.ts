@@ -75,14 +75,16 @@ describe("lightweight calendar fallback", () => {
     );
 
     expect(result.capabilities.calendar).toBe("available");
-    expect(result.data.items?.map((event) => event.eventId)).toEqual([701, 801]);
+    expect(result.data.items?.map((event) => event.eventId)).toEqual([
+      701, 801,
+    ]);
     expect(result.data.items?.map((event) => event.courseId)).toEqual([7, 8]);
     expect(result.data.cursor.afterEventId).toBeNull();
     expect(result.data.complete).toBe(false);
     expect(result.data.scope).toMatch(/fallback/i);
-    expect(result.warnings.some((w) => w.code === "CALENDAR_GROUPED_FALLBACK")).toBe(
-      true,
-    );
+    expect(
+      result.warnings.some((w) => w.code === "CALENDAR_GROUPED_FALLBACK"),
+    ).toBe(true);
     expect(call.mock.calls.map((entry) => entry[0])).toEqual([
       "core_enrol_get_users_courses",
       "core_calendar_get_action_events_by_courses",
