@@ -1,0 +1,11 @@
+import { readFile,writeFile } from 'node:fs/promises';
+import { registerAllTools } from '../src/register-tools.js';
+import type { McpServer } from '@modelcontextprotocol/server';
+const tools:{name:string;description:string}[]=[];
+registerAllTools({registerTool(name:string,options:{description?:string}){tools.push({name,description:options.description??name});return {};}} as unknown as McpServer,async()=>{throw new Error('Manifest generation must not contact Moodle');});
+if(new Set(tools.map(t=>t.name)).size!==tools.length)throw new Error('Duplicate tool registration');
+const manifest=JSON.parse(await readFile('manifest.json','utf8'));
+const pkg=JSON.parse(await readFile('package.json','utf8'));
+manifest.version=pkg.version;manifest.tools=tools;
+await writeFile('manifest.json',JSON.stringify(manifest,null,2)+'\n');
+console.log(JSON.stringify({version:manifest.version,toolCount:tools.length}));
