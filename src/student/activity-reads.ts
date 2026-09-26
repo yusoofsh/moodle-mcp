@@ -31,6 +31,27 @@ function add(
     params,
   };
 }
+add(
+  "mod_forum_get_forum_access_information",
+  "forum",
+  "Read capability metadata for one visible forum; this does not view, subscribe, post, pin or mark anything read",
+  {},
+  (_c, a) => ({ forumid: instance(a) }),
+);
+add(
+  "mod_h5pactivity_get_h5pactivity_access_information",
+  "h5pactivity",
+  "Read capability metadata for one visible H5P activity without launching or submitting an attempt",
+  {},
+  (_c, a) => ({ h5pactivityid: instance(a) }),
+);
+add(
+  "mod_h5pactivity_get_results",
+  "h5pactivity",
+  "Read results for the current student's existing H5P attempts only; caller-supplied attempt IDs are intentionally not accepted",
+  {},
+  (_c, a) => ({ h5pactivityid: instance(a) }),
+);
 for (const [name, type, key] of [
   ["mod_choice_get_choice_options", "choice", "choiceid"],
   ["mod_choice_get_choice_results", "choice", "choiceid"],

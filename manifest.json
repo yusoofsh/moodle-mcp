@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "moodle-mcp",
   "display_name": "Moodle MCP",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "description": "Give Claude access to your Moodle courses, assignments, grades, quizzes, calendar, forums, and notifications.",
   "long_description": "Moodle MCP connects Claude to any Moodle LMS instance. Ask about upcoming deadlines, check your grades, browse course resources, read assignment feedback, and more — all in natural language.\n\nSupports token-based auth (recommended) or username/password login.",
   "author": {
@@ -29,9 +29,7 @@
     "entry_point": "dist/server.js",
     "mcp_config": {
       "command": "node",
-      "args": [
-        "${__dirname}/dist/server.js"
-      ],
+      "args": ["${__dirname}/dist/server.js"],
       "env": {
         "MOODLE_URL": "${user_config.moodle_url}",
         "MOODLE_TOKEN": "${user_config.moodle_token}",
@@ -195,10 +193,7 @@
     }
   ],
   "compatibility": {
-    "platforms": [
-      "darwin",
-      "win32"
-    ],
+    "platforms": ["darwin", "win32"],
     "runtimes": {
       "node": ">=24.0.0"
     }

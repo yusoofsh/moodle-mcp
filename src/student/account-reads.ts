@@ -8,7 +8,112 @@ const page = {
 const get = (a: Record<string, unknown>, key: string, fallback: number) =>
   typeof a[key] === "number" ? (a[key] as number) : fallback;
 const conversation = z.object({ conversationId: idSchema, ...page }).strict();
+
+const timelineClassification = z.enum([
+  "all",
+  "past",
+  "inprogress",
+  "future",
+  "favourites",
+]);
+const timelineInput = z
+  .object({
+    classification: timelineClassification.optional(),
+    offset: z.number().int().min(0).max(100000).optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  })
+  .strict();
+const scopedSearchInput = z
+  .object({
+    courseId: idSchema,
+    query: z.string().trim().min(2).max(200),
+    areaIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[A-Za-z0-9_.-]+$/)
+          .max(100),
+      )
+      .max(10)
+      .optional(),
+    page: z.number().int().min(0).max(1000).optional(),
+  })
+  .strict();
+const timelineParams = (a: Record<string, unknown>) => ({
+  classification:
+    typeof a.classification === "string" ? a.classification : "all",
+  limit: get(a, "limit", 20),
+  offset: get(a, "offset", 0),
+  sort: "fullname ASC",
+});
+const scopedSearchParams = (
+  a: Record<string, unknown>,
+  includePage: boolean,
+) => {
+  const params: Record<string, string | number | boolean> = {
+    query: a.query as string,
+    "filters[courseids][0]": a.courseId as number,
+    "filters[mycoursesonly]": true,
+  };
+  for (const [index, area] of (
+    (a.areaIds as string[] | undefined) ?? []
+  ).entries())
+    params["filters[areaids][" + index + "]"] = area;
+  if (includePage) params.page = get(a, "page", 0);
+  return params;
+};
+
 export const ACCOUNT_READS: Record<string, ReadOperation> = {
+  core_message_get_unread_notification_count: {
+    input: z.object({}).strict(),
+    scope: "self",
+    purpose:
+      "Read the current student's unread notification count without marking anything read",
+    params: (c) => ({ useridto: c.userId }),
+  },
+  core_course_get_enrolled_courses_by_timeline_classification: {
+    input: timelineInput,
+    scope: "self",
+    purpose:
+      "Read a bounded timeline classification of the current student's enrolled courses without changing favourites or course views",
+    params: (_c, a) => timelineParams(a),
+  },
+  core_course_get_enrolled_courses_with_action_events_by_timeline_classification:
+    {
+      input: timelineInput,
+      scope: "self",
+      purpose:
+        "Read a bounded timeline classification of the current student's enrolled courses that already have action events; does not create or modify events",
+      params: (_c, a) => timelineParams(a),
+    },
+  core_search_get_search_areas_list: {
+    input: z
+      .object({
+        category: z.string().trim().max(100).optional(),
+      })
+      .strict(),
+    scope: "self",
+    purpose:
+      "List enabled global-search areas visible to the current account; no search/view event is recorded",
+    params: (_c, a) => ({
+      cat: typeof a.category === "string" ? a.category : "",
+    }),
+  },
+  core_search_get_results: {
+    input: scopedSearchInput,
+    scope: "self",
+    purpose:
+      "Search only within one currently visible course using Moodle global search; no result/view event or external search is invoked",
+    params: (_c, a) => scopedSearchParams(a, true),
+  },
+  core_search_get_top_results: {
+    input: scopedSearchInput.omit({ page: true }),
+    scope: "self",
+    purpose:
+      "Read top Moodle global-search results only within one currently visible course; no result/view event is recorded",
+    params: (_c, a) => scopedSearchParams(a, false),
+  },
+
   core_message_get_conversation: {
     input: conversation,
     scope: "self",
