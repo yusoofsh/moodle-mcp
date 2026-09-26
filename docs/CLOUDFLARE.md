@@ -122,7 +122,7 @@ The Workers suite executes the actual bundled application in workerd through Min
 
 Upstream oidc-provider officially targets Node.js and emits an unsupported-runtime warning under Cloudflare compatibility. Workerd tests are our compatibility evidence, not an upstream support guarantee or independent audit. Keep versions locked and rerun tests on upgrades. Local workerd tests do not prove production CPU accounting or university API compatibility.
 
-The OCI workflow also runs Workers tests before publication. The separate manually triggered Deploy Cloudflare Worker workflow needs Actions secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. Runtime password/Moodle secrets are configured separately in Cloudflare. CLI deployment is sufficient; GitHub Actions is optional. Neither workflow purchases a plan.
+The OCI workflow also runs Workers tests before publication. The separate manually triggered Deploy Cloudflare Worker workflow needs the CLOUDFLARE_ACCOUNT_ID Actions variable and the CLOUDFLARE_API_TOKEN Actions secret. Runtime password/Moodle secrets are configured separately in Cloudflare. CLI deployment is sufficient; GitHub Actions is optional. Neither workflow purchases a plan.
 
 ## References
 
