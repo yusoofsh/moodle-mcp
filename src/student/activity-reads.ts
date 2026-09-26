@@ -52,6 +52,27 @@ add(
   {},
   (_c, a) => ({ h5pactivityid: instance(a) }),
 );
+add(
+  "mod_forum_can_add_discussion",
+  "forum",
+  "Read whether the current student can start a discussion in one visible forum; does not create a discussion or attachment",
+  {},
+  (_c, a) => ({ forumid: instance(a) }),
+);
+add(
+  "mod_h5pactivity_get_attempts",
+  "h5pactivity",
+  "Read attempt summaries only for the current student in one visible H5P activity; userids is intentionally omitted",
+  {},
+  (_c, a) => ({ h5pactivityid: instance(a) }),
+);
+add(
+  "mod_bigbluebuttonbn_can_join",
+  "bigbluebuttonbn",
+  "Read whether the current student can join one visible BigBlueButton activity; does not request a join URL or launch a meeting",
+  {},
+  (_c, a) => ({ cmid: a.moduleId as number, groupid: 0 }),
+);
 for (const [name, type, key] of [
   ["mod_choice_get_choice_options", "choice", "choiceid"],
   ["mod_choice_get_choice_results", "choice", "choiceid"],
