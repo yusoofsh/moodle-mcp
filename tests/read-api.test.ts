@@ -51,6 +51,7 @@ describe("explicit API allowlist", () => {
     "mod_quiz_start_attempt",
     "mod_quiz_get_attempt_data",
     "mod_lesson_get_page_data",
+    "mod_h5pactivity_get_user_attempts",
     "tool_mobile_get_content",
     "tool_mobile_call_external_functions",
     "tool_mobile_get_autologin_key",

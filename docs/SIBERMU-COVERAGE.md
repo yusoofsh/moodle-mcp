@@ -125,3 +125,23 @@ report, and withholds hidden-by-date/hidden values and feedback. Grades and popu
 notifications now use strict structured outputs; popup reads exclude other
 recipients and do not mark notifications read. Synthetic regressions distinguish
 these states from empty lists, completed submissions or zero grades.
+
+## Lightweight read-coverage tranche (0.10.3)
+
+This increment deliberately avoids bulk wrapper generation. It adds nine reviewed
+read routes with small strict schemas: current-account unread notification count,
+two self-enrolled course timeline queries, course-scoped Moodle global search
+(areas/results/top results), forum capability metadata, H5P capability metadata,
+and current-student H5P results with caller-supplied attempt IDs disabled.
+
+The global-search result routes require a visible courseId; they do not offer
+site-wide user/context filters. Timeline classifications are limited to all, past,
+inprogress, future, and favourites with a maximum 50-course page and a fixed safe
+sort. Forum/H5P reads resolve the activity instance from a currently visible
+course module before invocation.
+
+mod_h5pactivity_get_user_attempts remains intentionally blocked: Moodle 4.5
+requires the ability to view all attempts and returns enrolled-user attempt data,
+which is a different privacy boundary from current-student results. This release
+does not add writes, activity-view endpoints, launches, read receipts, attendance
+marking, arbitrary search contexts, or raw REST passthrough.

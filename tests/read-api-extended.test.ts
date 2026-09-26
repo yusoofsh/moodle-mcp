@@ -174,6 +174,136 @@ describe("reviewed additional API contracts", () => {
       { id: 7 },
     );
   });
+  it("binds unread notification count to the current student", async () => {
+    await invokeReadOperation(
+      client,
+      "core_message_get_unread_notification_count",
+      {},
+    );
+    expect(call).toHaveBeenLastCalledWith(
+      "core_message_get_unread_notification_count",
+      { useridto: 42 },
+    );
+  });
+  it("keeps course timeline reads bounded and self-scoped", async () => {
+    await invokeReadOperation(
+      client,
+      "core_course_get_enrolled_courses_by_timeline_classification",
+      { classification: "inprogress", offset: 2, limit: 5 },
+    );
+    expect(call).toHaveBeenLastCalledWith(
+      "core_course_get_enrolled_courses_by_timeline_classification",
+      {
+        classification: "inprogress",
+        limit: 5,
+        offset: 2,
+        sort: "fullname ASC",
+      },
+    );
+    await invokeReadOperation(
+      client,
+      "core_course_get_enrolled_courses_with_action_events_by_timeline_classification",
+      { classification: "future", limit: 3 },
+    );
+    expect(call).toHaveBeenLastCalledWith(
+      "core_course_get_enrolled_courses_with_action_events_by_timeline_classification",
+      {
+        classification: "future",
+        limit: 3,
+        offset: 0,
+        sort: "fullname ASC",
+      },
+    );
+  });
+  it("scopes global search to a visible course and bounded area IDs", async () => {
+    await invokeReadOperation(client, "core_search_get_results", {
+      courseId: 7,
+      query: "aqidah akhlak",
+      areaIds: ["mod_forum-post", "mod_page-activity"],
+      page: 2,
+    });
+    expect(call).toHaveBeenLastCalledWith("core_search_get_results", {
+      query: "aqidah akhlak",
+      "filters[courseids][0]": 7,
+      "filters[mycoursesonly]": true,
+      "filters[areaids][0]": "mod_forum-post",
+      "filters[areaids][1]": "mod_page-activity",
+      page: 2,
+    });
+    await expect(
+      invokeReadOperation(client, "core_search_get_results", {
+        query: "site wide",
+      }),
+    ).rejects.toThrow();
+  });
+  it("resolves forum capability reads through the verified instance ID", async () => {
+    call.mockImplementation(async (fn) =>
+      fn === "core_course_get_contents"
+        ? [
+            {
+              id: 1,
+              name: "Week",
+              modules: [
+                {
+                  id: 101,
+                  instance: 201,
+                  name: "Forum",
+                  modname: "forum",
+                  uservisible: true,
+                },
+              ],
+            },
+          ]
+        : {},
+    );
+    await invokeReadOperation(
+      client,
+      "mod_forum_get_forum_access_information",
+      {
+        courseId: 7,
+        moduleId: 101,
+      },
+    );
+    expect(call).toHaveBeenLastCalledWith(
+      "mod_forum_get_forum_access_information",
+      { forumid: 201 },
+    );
+  });
+  it("keeps H5P result reads current-user only by refusing arbitrary attempt IDs", async () => {
+    call.mockImplementation(async (fn) =>
+      fn === "core_course_get_contents"
+        ? [
+            {
+              id: 1,
+              name: "Week",
+              modules: [
+                {
+                  id: 101,
+                  instance: 201,
+                  name: "H5P",
+                  modname: "h5pactivity",
+                  uservisible: true,
+                },
+              ],
+            },
+          ]
+        : {},
+    );
+    await invokeReadOperation(client, "mod_h5pactivity_get_results", {
+      courseId: 7,
+      moduleId: 101,
+    });
+    expect(call).toHaveBeenLastCalledWith("mod_h5pactivity_get_results", {
+      h5pactivityid: 201,
+    });
+    await expect(
+      invokeReadOperation(client, "mod_h5pactivity_get_results", {
+        courseId: 7,
+        moduleId: 101,
+        attemptids: [999],
+      }),
+    ).rejects.toThrow();
+  });
   it("does not include future tasks outside the explicit lookahead", async () => {
     const now = 1800000000;
     call.mockImplementation(async (fn) =>
