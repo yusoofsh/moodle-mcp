@@ -9,6 +9,14 @@ const get = (a: Record<string, unknown>, key: string, fallback: number) =>
   typeof a[key] === "number" ? (a[key] as number) : fallback;
 const conversation = z.object({ conversationId: idSchema, ...page }).strict();
 
+const smallPage = z
+  .object({
+    offset: z.number().int().min(0).max(100000).optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  })
+  .strict();
+const visibleCourse = z.object({ courseId: idSchema }).strict();
+
 const timelineClassification = z.enum([
   "all",
   "past",
@@ -64,6 +72,47 @@ const scopedSearchParams = (
 };
 
 export const ACCOUNT_READS: Record<string, ReadOperation> = {
+  core_ai_get_policy_status: {
+    input: z.object({}).strict(),
+    scope: "self",
+    purpose:
+      "Read only the current student's AI policy acceptance status; never accepts policy or selects another user",
+    params: (c) => ({ userid: c.userId }),
+  },
+  block_recentlyaccesseditems_get_recent_items: {
+    input: z
+      .object({ limit: z.number().int().min(1).max(50).optional() })
+      .strict(),
+    scope: "self",
+    purpose:
+      "Read a bounded list of activities/resources already recorded as recently accessed by the current student; does not record a new access",
+    params: (_c, a) => ({ limit: get(a, "limit", 20) }),
+  },
+  block_starredcourses_get_starred_courses: {
+    input: smallPage,
+    scope: "self",
+    purpose:
+      "Read the current student's starred enrolled courses without changing favourites",
+    params: (_c, a) => ({
+      limit: get(a, "limit", 20),
+      offset: get(a, "offset", 0),
+    }),
+  },
+  core_block_get_dashboard_blocks: {
+    input: z.object({}).strict(),
+    scope: "self",
+    purpose:
+      "Read current-student dashboard block metadata only; block HTML/content is intentionally omitted",
+    params: (c) => ({ userid: c.userId, returncontents: false }),
+  },
+  core_calendar_get_allowed_event_types: {
+    input: visibleCourse,
+    scope: "course",
+    purpose:
+      "Read which calendar event types the current student may create in one visible course; does not create or edit an event",
+    params: (_c, a) => ({ courseid: a.courseId as number }),
+  },
+
   core_message_get_unread_notification_count: {
     input: z.object({}).strict(),
     scope: "self",

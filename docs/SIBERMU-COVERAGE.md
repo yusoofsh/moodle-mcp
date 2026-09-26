@@ -145,3 +145,18 @@ requires the ability to view all attempts and returns enrolled-user attempt data
 which is a different privacy boundary from current-student results. This release
 does not add writes, activity-view endpoints, launches, read receipts, attendance
 marking, arbitrary search contexts, or raw REST passthrough.
+
+## Lightweight student-state metadata tranche (0.10.4)
+
+This increment adds eight small reviewed read routes without bulk generation:
+current-account AI policy status, recently accessed items, starred courses,
+dashboard block metadata without block content, allowed event types for one visible
+course, forum can-add-discussion capability, current-student H5P attempt summaries,
+and BigBlueButton can-join capability.
+
+Identity is injected for self-scoped APIs. Dashboard block contents are disabled,
+recent/starred lists are bounded to 50, calendar capability requires a visible
+course, forum/H5P/BigBlueButton calls require a currently visible module of the
+correct type, H5P userids cannot be supplied, and the BigBlueButton route never
+requests a join URL. No favourite, dashboard, calendar, discussion, H5P attempt or
+meeting state is changed.

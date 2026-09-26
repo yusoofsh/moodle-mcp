@@ -304,6 +304,147 @@ describe("reviewed additional API contracts", () => {
       }),
     ).rejects.toThrow();
   });
+  it("binds AI policy status and dashboard blocks to the current student", async () => {
+    await invokeReadOperation(client, "core_ai_get_policy_status", {});
+    expect(call).toHaveBeenLastCalledWith("core_ai_get_policy_status", {
+      userid: 42,
+    });
+    await invokeReadOperation(client, "core_block_get_dashboard_blocks", {});
+    expect(call).toHaveBeenLastCalledWith("core_block_get_dashboard_blocks", {
+      userid: 42,
+      returncontents: false,
+    });
+  });
+  it("keeps recent/starred dashboard reads bounded without recording activity", async () => {
+    await invokeReadOperation(
+      client,
+      "block_recentlyaccesseditems_get_recent_items",
+      { limit: 10 },
+    );
+    expect(call).toHaveBeenLastCalledWith(
+      "block_recentlyaccesseditems_get_recent_items",
+      { limit: 10 },
+    );
+    await invokeReadOperation(
+      client,
+      "block_starredcourses_get_starred_courses",
+      {
+        offset: 5,
+        limit: 10,
+      },
+    );
+    expect(call).toHaveBeenLastCalledWith(
+      "block_starredcourses_get_starred_courses",
+      { limit: 10, offset: 5 },
+    );
+  });
+  it("checks allowed calendar event types only inside a visible course", async () => {
+    await invokeReadOperation(client, "core_calendar_get_allowed_event_types", {
+      courseId: 7,
+    });
+    expect(call).toHaveBeenLastCalledWith(
+      "core_calendar_get_allowed_event_types",
+      { courseid: 7 },
+    );
+  });
+  it("reads forum posting capability without posting", async () => {
+    call.mockImplementation(async (fn) =>
+      fn === "core_course_get_contents"
+        ? [
+            {
+              id: 1,
+              name: "Week",
+              modules: [
+                {
+                  id: 101,
+                  instance: 201,
+                  name: "Forum",
+                  modname: "forum",
+                  uservisible: true,
+                },
+              ],
+            },
+          ]
+        : {},
+    );
+    await invokeReadOperation(client, "mod_forum_can_add_discussion", {
+      courseId: 7,
+      moduleId: 101,
+    });
+    expect(call).toHaveBeenLastCalledWith("mod_forum_can_add_discussion", {
+      forumid: 201,
+    });
+    expect(
+      call.mock.calls.some((row) => row[0] === "mod_forum_add_discussion"),
+    ).toBe(false);
+  });
+  it("keeps H5P attempt summaries current-student only", async () => {
+    call.mockImplementation(async (fn) =>
+      fn === "core_course_get_contents"
+        ? [
+            {
+              id: 1,
+              name: "Week",
+              modules: [
+                {
+                  id: 101,
+                  instance: 201,
+                  name: "H5P",
+                  modname: "h5pactivity",
+                  uservisible: true,
+                },
+              ],
+            },
+          ]
+        : {},
+    );
+    await invokeReadOperation(client, "mod_h5pactivity_get_attempts", {
+      courseId: 7,
+      moduleId: 101,
+    });
+    expect(call).toHaveBeenLastCalledWith("mod_h5pactivity_get_attempts", {
+      h5pactivityid: 201,
+    });
+    await expect(
+      invokeReadOperation(client, "mod_h5pactivity_get_attempts", {
+        courseId: 7,
+        moduleId: 101,
+        userids: [99],
+      }),
+    ).rejects.toThrow();
+  });
+  it("uses a visible BigBlueButton cmid only for can-join metadata", async () => {
+    call.mockImplementation(async (fn) =>
+      fn === "core_course_get_contents"
+        ? [
+            {
+              id: 1,
+              name: "Week",
+              modules: [
+                {
+                  id: 101,
+                  instance: 201,
+                  name: "Meeting",
+                  modname: "bigbluebuttonbn",
+                  uservisible: true,
+                },
+              ],
+            },
+          ]
+        : {},
+    );
+    await invokeReadOperation(client, "mod_bigbluebuttonbn_can_join", {
+      courseId: 7,
+      moduleId: 101,
+    });
+    expect(call).toHaveBeenLastCalledWith("mod_bigbluebuttonbn_can_join", {
+      cmid: 101,
+      groupid: 0,
+    });
+    expect(call.mock.calls.some((row) => row[0].includes("get_join_url"))).toBe(
+      false,
+    );
+  });
   it("does not include future tasks outside the explicit lookahead", async () => {
     const now = 1800000000;
     call.mockImplementation(async (fn) =>
