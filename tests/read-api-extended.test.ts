@@ -495,4 +495,239 @@ describe("reviewed additional API contracts", () => {
     expect(r.data.lookahead.outsideLookaheadInCheckedPage).toBe(1);
     expect(r.data.coverage.statusChecks).toBe(1);
   });
+  it("reads current-course navigation and administration options without view/write calls", async () => {
+    await invokeReadOperation(
+      client,
+      "core_course_get_user_navigation_options",
+      { courseId: 7 },
+    );
+    expect(call).toHaveBeenLastCalledWith(
+      "core_course_get_user_navigation_options",
+      { "courseids[0]": 7 },
+    );
+    await invokeReadOperation(
+      client,
+      "core_course_get_user_administration_options",
+      { courseId: 7 },
+    );
+    expect(call).toHaveBeenLastCalledWith(
+      "core_course_get_user_administration_options",
+      { "courseids[0]": 7 },
+    );
+    expect(
+      call.mock.calls.some((row) =>
+        /view_course|update|create|delete|set_/.test(row[0]),
+      ),
+    ).toBe(false);
+  });
+  it("binds Feedback reads to the verified activity instance and never launches/processes responses", async () => {
+    call.mockImplementation(async (fn) =>
+      fn === "core_course_get_contents"
+        ? [
+            {
+              id: 1,
+              name: "Week",
+              modules: [
+                {
+                  id: 101,
+                  instance: 201,
+                  name: "Feedback",
+                  modname: "feedback",
+                  uservisible: true,
+                },
+              ],
+            },
+          ]
+        : {},
+    );
+    await invokeReadOperation(client, "mod_feedback_get_finished_responses", {
+      courseId: 7,
+      moduleId: 101,
+    });
+    expect(call).toHaveBeenLastCalledWith(
+      "mod_feedback_get_finished_responses",
+      { feedbackid: 201, courseid: 0 },
+    );
+    await invokeReadOperation(client, "mod_feedback_get_unfinished_responses", {
+      courseId: 7,
+      moduleId: 101,
+    });
+    expect(call).toHaveBeenLastCalledWith(
+      "mod_feedback_get_unfinished_responses",
+      { feedbackid: 201, courseid: 0 },
+    );
+    await invokeReadOperation(client, "mod_feedback_get_analysis", {
+      courseId: 7,
+      moduleId: 101,
+    });
+    expect(call).toHaveBeenLastCalledWith("mod_feedback_get_analysis", {
+      feedbackid: 201,
+      groupid: 0,
+      courseid: 0,
+    });
+    await invokeReadOperation(client, "mod_feedback_get_page_items", {
+      courseId: 7,
+      moduleId: 101,
+      page: 2,
+    });
+    expect(call).toHaveBeenLastCalledWith("mod_feedback_get_page_items", {
+      feedbackid: 201,
+      page: 2,
+      courseid: 0,
+    });
+    expect(
+      call.mock.calls.some((row) =>
+        /launch|process|submit|view_feedback/.test(row[0]),
+      ),
+    ).toBe(false);
+  });
+  it("reads existing SCORM state for the current student without launching or inserting tracks", async () => {
+    call.mockImplementation(async (fn) =>
+      fn === "core_course_get_contents"
+        ? [
+            {
+              id: 1,
+              name: "Week",
+              modules: [
+                {
+                  id: 101,
+                  instance: 201,
+                  name: "SCORM",
+                  modname: "scorm",
+                  uservisible: true,
+                },
+              ],
+            },
+          ]
+        : {},
+    );
+    await invokeReadOperation(client, "mod_scorm_get_scorm_user_data", {
+      courseId: 7,
+      moduleId: 101,
+      attempt: 1,
+    });
+    expect(call).toHaveBeenLastCalledWith("mod_scorm_get_scorm_user_data", {
+      scormid: 201,
+      attempt: 1,
+    });
+    expect(
+      call.mock.calls.some((row) => /launch|insert_scorm_tracks/.test(row[0])),
+    ).toBe(false);
+  });
+  it("adds bounded Glossary category/author reads with non-approved entries disabled", async () => {
+    await invokeReadOperation(client, "mod_glossary_get_entries_by_category", {
+      courseId: 7,
+      moduleId: 101,
+      categoryId: -1,
+      offset: 2,
+      limit: 5,
+    });
+    expect(call).toHaveBeenLastCalledWith(
+      "mod_glossary_get_entries_by_category",
+      {
+        id: 201,
+        categoryid: -1,
+        from: 2,
+        limit: 5,
+        "options[includenotapproved]": false,
+      },
+    );
+    await invokeReadOperation(client, "mod_glossary_get_entries_by_author", {
+      courseId: 7,
+      moduleId: 101,
+      letter: "A",
+      field: "FIRSTNAME",
+      sort: "DESC",
+      limit: 4,
+    });
+    expect(call).toHaveBeenLastCalledWith(
+      "mod_glossary_get_entries_by_author",
+      {
+        id: 201,
+        letter: "A",
+        field: "FIRSTNAME",
+        sort: "DESC",
+        from: 0,
+        limit: 4,
+        "options[includenotapproved]": false,
+      },
+    );
+  });
+  it("searches only the verified Database instance with bounded basic search", async () => {
+    call.mockImplementation(async (fn) =>
+      fn === "core_course_get_contents"
+        ? [
+            {
+              id: 1,
+              name: "Week",
+              modules: [
+                {
+                  id: 101,
+                  instance: 201,
+                  name: "Database",
+                  modname: "data",
+                  uservisible: true,
+                },
+              ],
+            },
+          ]
+        : {},
+    );
+    await invokeReadOperation(client, "mod_data_search_entries", {
+      courseId: 7,
+      moduleId: 101,
+      query: "research",
+      page: 1,
+      limit: 10,
+    });
+    expect(call).toHaveBeenLastCalledWith("mod_data_search_entries", {
+      databaseid: 201,
+      groupid: 0,
+      returncontents: true,
+      search: "research",
+      page: 1,
+      perpage: 10,
+    });
+  });
+  it("reads a Lesson summary without accepting a password or starting an attempt", async () => {
+    call.mockImplementation(async (fn) =>
+      fn === "core_course_get_contents"
+        ? [
+            {
+              id: 1,
+              name: "Week",
+              modules: [
+                {
+                  id: 101,
+                  instance: 201,
+                  name: "Lesson",
+                  modname: "lesson",
+                  uservisible: true,
+                },
+              ],
+            },
+          ]
+        : {},
+    );
+    await invokeReadOperation(client, "mod_lesson_get_lesson", {
+      courseId: 7,
+      moduleId: 101,
+    });
+    expect(call).toHaveBeenLastCalledWith("mod_lesson_get_lesson", {
+      lessonid: 201,
+      password: "",
+    });
+    await expect(
+      invokeReadOperation(client, "mod_lesson_get_lesson", {
+        courseId: 7,
+        moduleId: 101,
+        password: "secret",
+      }),
+    ).rejects.toThrow();
+    expect(
+      call.mock.calls.some((row) =>
+        /launch_attempt|process_page|view_lesson/.test(row[0]),
+      ),
+    ).toBe(false);
+  });
 });

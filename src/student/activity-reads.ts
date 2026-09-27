@@ -319,4 +319,106 @@ add(
   {},
   (c, a) => ({ wikiid: instance(a), groupid: -1, userid: c.userId }),
 );
+
+add(
+  "mod_lesson_get_lesson",
+  "lesson",
+  "Read the visible Lesson summary without launching or viewing an attempt; password-protected content is not bypassed",
+  {},
+  (_c, a) => ({ lessonid: instance(a), password: "" }),
+);
+for (const name of [
+  "mod_feedback_get_finished_responses",
+  "mod_feedback_get_unfinished_responses",
+] as const)
+  add(
+    name,
+    "feedback",
+    "Read only the current student's finished or unfinished Feedback response values for one visible activity; does not launch, process or submit Feedback",
+    {},
+    (_c, a) => ({ feedbackid: instance(a), courseid: 0 }),
+  );
+add(
+  "mod_feedback_get_analysis",
+  "feedback",
+  "Read Feedback analysis only when Moodle grants the current account analysis permission; does not launch or submit Feedback",
+  {},
+  (_c, a) => ({ feedbackid: instance(a), groupid: 0, courseid: 0 }),
+);
+add(
+  "mod_feedback_get_page_items",
+  "feedback",
+  "Read one permitted Feedback page definition without launching or processing a response",
+  { page: z.number().int().min(0).max(10000).optional() },
+  (_c, a) => ({
+    feedbackid: instance(a),
+    page: int(a, "page", 0),
+    courseid: 0,
+  }),
+);
+add(
+  "mod_scorm_get_scorm_user_data",
+  "scorm",
+  "Read current-student SCORM tracking/default data for an existing attempt; does not launch a SCO or insert tracks",
+  { attempt: z.number().int().min(1).max(10000) },
+  (_c, a) => ({ scormid: instance(a), attempt: a.attempt as number }),
+);
+add(
+  "mod_glossary_get_entries_by_category",
+  "glossary",
+  "Read visible Glossary entries by a category in one verified Glossary; non-approved entries from other users are excluded",
+  {
+    ...paged,
+    categoryId: z.number().int().min(-1).max(Number.MAX_SAFE_INTEGER),
+  },
+  (_c, a) => ({
+    id: instance(a),
+    categoryid: a.categoryId as number,
+    from: int(a, "offset", 0),
+    limit: int(a, "limit", 20),
+    "options[includenotapproved]": false,
+  }),
+);
+add(
+  "mod_glossary_get_entries_by_author",
+  "glossary",
+  "Read visible Glossary entries grouped by author name in one verified Glossary; non-approved entries from other users are excluded",
+  {
+    ...paged,
+    letter: z
+      .string()
+      .regex(/^(ALL|SPECIAL|[A-Za-z])$/)
+      .optional(),
+    field: z.enum(["FIRSTNAME", "LASTNAME"]).optional(),
+    sort: z.enum(["ASC", "DESC"]).optional(),
+  },
+  (_c, a) => ({
+    id: instance(a),
+    letter: typeof a.letter === "string" ? a.letter : "ALL",
+    field: typeof a.field === "string" ? a.field : "LASTNAME",
+    sort: typeof a.sort === "string" ? a.sort : "ASC",
+    from: int(a, "offset", 0),
+    limit: int(a, "limit", 20),
+    "options[includenotapproved]": false,
+  }),
+);
+add(
+  "mod_data_search_entries",
+  "data",
+  "Search visible Database activity entries using a bounded basic-text query; no entry is created, approved, edited or deleted",
+  {
+    query: z.string().trim().min(1).max(200),
+    page: z.number().int().min(0).max(10000).optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  },
+  (_c, a) => ({
+    databaseid: instance(a),
+    groupid: 0,
+    returncontents: true,
+    search: a.query as string,
+    page: int(a, "page", 0),
+    perpage: int(a, "limit", 20),
+  }),
+);
+
 export const ACTIVITY_READS = Object.freeze(registry);

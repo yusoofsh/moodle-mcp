@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { MoodleClient } from "../moodle-client.js";
 import type { ReadOperation } from "./safe-api.js";
 import { idSchema } from "./result.js";
 const page = {
@@ -273,3 +274,24 @@ export const ACCOUNT_READS: Record<string, ReadOperation> = {
     }),
   },
 };
+
+Object.assign(ACCOUNT_READS, {
+  core_course_get_user_navigation_options: {
+    input: visibleCourse,
+    scope: "course",
+    purpose:
+      "Read navigation options available to the current student in one visible course; does not record a course view or change settings",
+    params: (_c: MoodleClient, a: Record<string, unknown>) => ({
+      "courseids[0]": a.courseId as number,
+    }),
+  },
+  core_course_get_user_administration_options: {
+    input: visibleCourse,
+    scope: "course",
+    purpose:
+      "Read administration capability options for the current student in one visible course; capability metadata does not authorize a write through this bridge",
+    params: (_c: MoodleClient, a: Record<string, unknown>) => ({
+      "courseids[0]": a.courseId as number,
+    }),
+  },
+});
