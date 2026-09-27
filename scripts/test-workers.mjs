@@ -359,7 +359,12 @@ async function start(override = {}) {
         case "core_calendar_get_action_events_by_timesort":
           if (params.get("wsfunction").endsWith("_by_course"))
             assert.equal(params.get("courseid"), "7");
-          else assert.equal(params.get("userid"), "42");
+          else
+            assert.equal(
+              params.has("userid"),
+              false,
+              "current-user calendar reads must omit userid",
+            );
           return Response.json({
             events: [
               {
