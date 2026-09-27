@@ -79,6 +79,10 @@ bunx --no-install wrangler login
 bun run workers:deploy
 ```
 
+GitHub Actions deploys the Worker on pushes to `master` after its full check suite
+passes; it can also be started manually. The GHCR image publication is manual-only
+from `master`, while pull requests still run the OCI workflow's checks.
+
 Add Worker runtime secrets using Cloudflare's dashboard or Wrangler:
 
 ```bash
@@ -115,10 +119,12 @@ respective release, not the current tool inventory.
 
 ## OCI and local stdio
 
-GitHub Actions publishes `ghcr.io/yusoofsh/moodle-mcp:latest` and
-`sha-<full-commit-SHA>` for amd64/arm64 after tests pass. Use the immutable digest
-from the successful publication run when pinning a deployment. Publishing does
-not itself start a hosted service.
+The `Test and publish OCI image` workflow runs checks on pull requests to `master`.
+Manually dispatch it from `master` to publish
+`ghcr.io/yusoofsh/moodle-mcp:latest` and `sha-<full-commit-SHA>` for amd64/arm64.
+Ordinary pushes do not publish automatically. Use the immutable digest from the
+successful publication run when pinning a deployment. Publishing does not itself
+start a hosted service.
 
 ```bash
 cp .env.example .env

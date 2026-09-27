@@ -1,7 +1,5 @@
 name: Test and publish OCI image
 on:
-  push:
-    branches: [master]
   pull_request:
     branches: [master]
   workflow_dispatch:
@@ -68,7 +66,7 @@ jobs:
           test "$(docker inspect --format '{{.Config.User}}' moodle-smoke)" = node
   publish:
     needs: test
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
