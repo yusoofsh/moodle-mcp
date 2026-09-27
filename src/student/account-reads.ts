@@ -273,3 +273,20 @@ export const ACCOUNT_READS: Record<string, ReadOperation> = {
     }),
   },
 };
+
+Object.assign(ACCOUNT_READS, {
+  core_course_get_user_navigation_options: {
+    input: visibleCourse,
+    scope: "course",
+    purpose:
+      "Read navigation options available to the current student in one visible course; does not record a course view or change settings",
+    params: (_c, a) => ({ "courseids[0]": a.courseId as number }),
+  },
+  core_course_get_user_administration_options: {
+    input: visibleCourse,
+    scope: "course",
+    purpose:
+      "Read administration capability options for the current student in one visible course; capability metadata does not authorize a write through this bridge",
+    params: (_c, a) => ({ "courseids[0]": a.courseId as number }),
+  },
+});

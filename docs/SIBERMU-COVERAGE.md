@@ -160,3 +160,23 @@ course, forum/H5P/BigBlueButton calls require a currently visible module of the
 correct type, H5P userids cannot be supplied, and the BigBlueButton route never
 requests a join URL. No favourite, dashboard, calendar, discussion, H5P attempt or
 meeting state is changed.
+
+## Incremental read-adapter tranche (0.10.5)
+
+This bounded follow-up intentionally avoids large generated registries and memory-heavy
+local full builds. It adds reviewed invocation routes only for small, source-checked
+read operations: current-course navigation/administration options, Lesson summary,
+Feedback current/finished response state plus page/analysis reads, current-attempt
+SCORM data, bounded Glossary category/author browsing and basic Database search.
+
+Every activity route resolves a currently visible course module to its server-side
+instance ID before calling Moodle. Callers cannot provide another user ID, a raw URL,
+a Lesson password, an arbitrary activity instance ID, advanced Database filters, or
+Feedback write/launch parameters. Feedback analysis remains permission-gated by Moodle.
+No view, attempt launch, submission, tracking insert, approval, or other write endpoint
+is used by these adapters.
+
+Local verification for this increment is intentionally limited to focused unit tests
+and formatting; full TypeScript, all tests, Worker bundle, browser OAuth/SSO and audit
+remain CI gates before merge/deploy. Live Composio calls are recorded only after the
+exact tested commit is deployed.
