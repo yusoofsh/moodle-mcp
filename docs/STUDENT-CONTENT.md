@@ -90,7 +90,9 @@ prevent the result being labelled a complete thread/list.
 course.id and explicit ISO UTC dates. Optional courseId chooses
 core_calendar_get_action_events_by_course BEFORE upstream pagination; it no longer
 filters a limited global result and silently loses events. Without courseId it
-uses core_calendar_get_action_events_by_timesort with the current user ID.
+uses core_calendar_get_action_events_by_timesort in the authenticated user's
+context, leaving userid unset so Moodle does not treat this as another user's
+events request.
 
 Defaults: next 30 days, optional lookback, limit 50 (maximum 100); bounded date
 window maximum 180 days. Use returned from/to and cursor.afterEventId for the next

@@ -117,7 +117,9 @@ export async function readCalendar(
   };
   if (options.courseId !== undefined) params.courseid = options.courseId;
   else {
-    params.userid = client.userId;
+    // Omitting userid makes Moodle use the authenticated user's context. An
+    // explicit ID is only needed to read another user's events and may require
+    // moodle/calendar:manageentries.
     params.limittononsuspendedevents = true;
   }
   const primary = await readApi(client, api, params, eventsSchema);
