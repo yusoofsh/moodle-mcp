@@ -3,6 +3,8 @@ import { normalizeUrl, parseMaxFileMb, type Config } from "../config.js";
 import { WORKERS_PASSWORD_PREFIX } from "../auth/password.js";
 
 export interface WorkerEnv {
+  MCP_EVENTS_RELAY_URL?: string;
+  MCP_EVENTS_RELAY_TOKEN?: string;
   MOODLE_MCP: DurableObjectNamespace;
   PUBLIC_URL?: string;
   AUTH_SECRET?: string;

@@ -243,3 +243,7 @@ silently joined to earlier pages. Do not combine it with explicit page controls;
 use the original fileId for a new explicit window. A final window is not labelled
 a complete document on its own; consumers must retain all preceding windows.
 This is ordinary file pagination, not an arbitrary API-dispatch mechanism.
+
+## MCP Events
+
+See [event catalog, configuration, and rollout](docs/mcp-events.md).
