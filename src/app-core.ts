@@ -16,6 +16,8 @@ import type { HttpConfig } from "./auth/config.js";
 import type { SqlAuthStore } from "./auth/sql-store.js";
 import { createProvider } from "./auth/provider.js";
 import { interactionRouter, type Fetcher } from "./auth/interactions.js";
+import { moodleEventHub } from "./events/moodle.js";
+import { type WebhookPost, EventError } from "./events/core.js";
 
 export function createAppWithStore(
   config: HttpConfig,
@@ -26,6 +28,8 @@ export function createAppWithStore(
     moodleFactory?: MoodleFactory;
     createMoodleClient?: () => Promise<MoodleClient>;
     backgroundCleanup?: boolean;
+    eventPost?: WebhookPost;
+    disableEvents?: boolean;
     disableHttpRateLimits?: boolean;
   } = {},
 ) {
@@ -156,11 +160,77 @@ export function createAppWithStore(
       });
     return pending;
   };
+  const events = moodleEventHub(
+    store,
+    getClient,
+    async (grant) => Boolean(await provider.Grant.find(grant)),
+    dependencies.eventPost,
+  );
+  const eventTimer =
+    dependencies.backgroundCleanup === false
+      ? undefined
+      : setInterval(() => {
+          void events
+            .tick()
+            .catch(() => console.error("MCP event check failed"));
+        }, 60000);
+  eventTimer?.unref();
   app.post("/mcp", express.json({ limit: "1mb" }), async (req, res) => {
+    if (
+      !dependencies.disableEvents &&
+      typeof req.body?.method === "string" &&
+      req.body.method.startsWith("events/")
+    ) {
+      const access = req.auth
+        ? await provider.AccessToken.find(req.auth.token)
+        : undefined;
+      if (!access?.grantId) {
+        res.status(401).end();
+        return;
+      }
+      try {
+        if (req.body.method === "events/subscribe") {
+          const course = req.body.params?.arguments?.course_id;
+          if (typeof course === "string")
+            await events.prepare(course, access.grantId);
+        }
+        const result = await events.hub.handle(
+          req.body.method,
+          req.body.params ?? {},
+          access.grantId,
+        );
+        res.json({ jsonrpc: "2.0", id: req.body.id ?? null, result });
+      } catch (error) {
+        const e =
+          error instanceof EventError
+            ? error
+            : new EventError(-32603, "Event operation failed");
+        res.json({
+          jsonrpc: "2.0",
+          id: req.body.id ?? null,
+          error: {
+            code: e.code,
+            message: e.message,
+            ...(e.reason ? { data: { reason: e.reason } } : {}),
+          },
+        });
+      }
+      return;
+    }
     const server = new McpServer({ name: "moodle-mcp", version: "0.10.5" });
     registerAllTools(server, getClient);
     registerResources(server, getClient);
     registerPrompts(server);
+    // Events are handled after the same bearer middleware as tools.
+    const capabilities = server.server.getCapabilities();
+    server.server.setRequestHandler("server/discover", () => ({
+      resultType: "complete",
+      supportedVersions: ["2026-07-28"],
+      capabilities: {
+        ...capabilities,
+        ...(!dependencies.disableEvents ? { events: {} } : {}),
+      },
+    }));
     const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -197,8 +267,12 @@ export function createAppWithStore(
     provider,
     store,
     connection,
+    eventsTick: events.tick,
+    eventsActive: async () =>
+      !dependencies.disableEvents && (await events.active()),
     close: () => {
       if (cleanup) clearInterval(cleanup);
+      if (eventTimer) clearInterval(eventTimer);
       store.close();
     },
   };

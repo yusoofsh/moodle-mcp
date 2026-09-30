@@ -116,6 +116,14 @@ export class SqlAuthStore {
         .get(model, this.hash(id)),
     );
   }
+  /** Internal encrypted-record enumeration; never exposed as an MCP tool. */
+  list(model: string): AdapterPayload[] {
+    return this.db
+      .prepare("SELECT * FROM oauth WHERE model=?")
+      .all(model)
+      .map((row) => this.open(row))
+      .filter((value): value is AdapterPayload => value !== undefined);
+  }
   cleanup(): void {
     this.db
       .prepare("DELETE FROM oauth WHERE expires IS NOT NULL AND expires <= ?")

@@ -1,3 +1,4 @@
+import { relayPost } from "./events/relay.js";
 import { DurableObject } from "cloudflare:workers";
 import { handleAsNodeRequest } from "cloudflare:node";
 import { createServer } from "node:http";
@@ -74,6 +75,15 @@ export class MoodleMcp extends DurableObject<WorkerEnv> {
       );
       const runtime = createAppWithStore(http, store, {
         backgroundCleanup: false,
+        disableEvents:
+          !this.env.MCP_EVENTS_RELAY_URL || !this.env.MCP_EVENTS_RELAY_TOKEN,
+        eventPost:
+          this.env.MCP_EVENTS_RELAY_URL && this.env.MCP_EVENTS_RELAY_TOKEN
+            ? relayPost(
+                this.env.MCP_EVENTS_RELAY_URL,
+                this.env.MCP_EVENTS_RELAY_TOKEN,
+              )
+            : undefined,
         disableHttpRateLimits: true,
         moodleConfig: moodle,
       });
@@ -113,6 +123,11 @@ export class MoodleMcp extends DurableObject<WorkerEnv> {
         path === "/mcp" ? 128 * 1024 : 16 * 1024,
       );
       const response = await handleAsNodeRequest(this.port, request);
+      if (
+        (await this.runtime!.eventsActive()) &&
+        (await this.ctx.storage.getAlarm()) === null
+      )
+        await this.ctx.storage.setAlarm(Date.now() + 60000);
       const bytes = await boundedBytes(response, 6 * 1024 * 1024);
       return new Response(bytes.length ? bytes : null, {
         status: response.status,
@@ -125,6 +140,15 @@ export class MoodleMcp extends DurableObject<WorkerEnv> {
         : fail(503, "Moodle MCP configuration or runtime is unavailable");
     } finally {
       this.active--;
+    }
+  }
+  async alarm(): Promise<void> {
+    await this.initialize();
+    try {
+      await this.runtime!.eventsTick();
+    } finally {
+      if (await this.runtime!.eventsActive())
+        await this.ctx.storage.setAlarm(Date.now() + 60000);
     }
   }
 }
