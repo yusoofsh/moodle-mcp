@@ -11,9 +11,26 @@ export function registerStudyHub(server: McpServer): void {
   server.registerResource(
     "study-hub",
     STUDY_HUB_URI,
-    { mimeType: "text/html;profile=mcp-app", description: "Read-only courses, tasks, material search and selected study context" },
-    async () => ({ contents: [{ uri: STUDY_HUB_URI, mimeType: "text/html;profile=mcp-app", text: studyHubHtml,
-      _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: true } } }] }),
+    {
+      mimeType: "text/html;profile=mcp-app",
+      description:
+        "Read-only courses, tasks, material search and selected study context",
+    },
+    async () => ({
+      contents: [
+        {
+          uri: STUDY_HUB_URI,
+          mimeType: "text/html;profile=mcp-app",
+          text: studyHubHtml,
+          _meta: {
+            ui: {
+              csp: { connectDomains: [], resourceDomains: [] },
+              prefersBorder: true,
+            },
+          },
+        },
+      ],
+    }),
   );
 }
 export const studyHubHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Study Hub</title><style>${appStyles}</style></head><body><main>
