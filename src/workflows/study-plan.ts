@@ -1,3 +1,4 @@
+import type { StudyPreferences } from "./settings.js";
 import { inputRequired, type McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { MoodleClientSource } from "../moodle-source.js";
@@ -83,6 +84,7 @@ export function allocateStudy(
 export function registerStudyPlan(
   server: McpServer,
   source: MoodleClientSource,
+  readPreferences?: () => StudyPreferences,
 ) {
   if (!canRegister(source, "moodle_plan_study")) return;
   server.registerTool(
@@ -130,6 +132,7 @@ export function registerStudyPlan(
               },
             ],
           };
+        const preferences = readPreferences?.();
         return inputRequired({
           inputRequests: {
             study_window: inputRequired.elicit({
@@ -141,18 +144,30 @@ export function registerStudyPlan(
                   daysAhead: {
                     type: "integer",
                     title: "Days ahead",
+                    ...(preferences
+                      ? { default: args.daysAhead ?? preferences.daysAhead }
+                      : {}),
                     minimum: 1,
                     maximum: 30,
                   },
                   minutesPerDay: {
                     type: "integer",
                     title: "Study minutes per day",
+                    ...(preferences
+                      ? {
+                          default:
+                            args.minutesPerDay ?? preferences.minutesPerDay,
+                        }
+                      : {}),
                     minimum: 15,
                     maximum: 240,
                   },
                   courseId: {
                     type: "integer",
                     title: "Course ID, or 0 for enrolled courses",
+                    ...(preferences
+                      ? { default: args.courseId ?? preferences.courseId }
+                      : {}),
                     minimum: 0,
                   },
                 },

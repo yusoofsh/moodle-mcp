@@ -1,3 +1,7 @@
+import {
+  registerStudySettings,
+  type StudyPreferenceStore,
+} from "./workflows/settings.js";
 import { registerStudyPlan } from "./workflows/study-plan.js";
 import { registerWorkflowMethods } from "./workflows/methods.js";
 import { registerQuizReviewTools } from "./tools/quiz-review.js";
@@ -20,9 +24,11 @@ import { registerSiteInfoTool } from "./tools/siteinfo.js";
 export function registerAllTools(
   server: McpServer,
   client: MoodleClientSource,
+  preferences?: StudyPreferenceStore,
 ): void {
   registerWorkflowMethods(server);
-  registerStudyPlan(server, client);
+  if (preferences) registerStudySettings(server, preferences);
+  registerStudyPlan(server, client, preferences?.read);
   registerCourseTools(server, client);
   registerFileTools(server, client);
   registerUrlTools(server, client);
