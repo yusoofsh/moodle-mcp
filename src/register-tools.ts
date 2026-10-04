@@ -1,3 +1,5 @@
+import { registerStudyPlan } from "./workflows/study-plan.js";
+import { registerWorkflowMethods } from "./workflows/methods.js";
 import { registerQuizReviewTools } from "./tools/quiz-review.js";
 import { registerCoverageTools } from "./tools/coverage.js";
 import { registerContentTools } from "./tools/content.js";
@@ -19,6 +21,8 @@ export function registerAllTools(
   server: McpServer,
   client: MoodleClientSource,
 ): void {
+  registerWorkflowMethods(server);
+  registerStudyPlan(server, client);
   registerCourseTools(server, client);
   registerFileTools(server, client);
   registerUrlTools(server, client);

@@ -29,7 +29,9 @@
     "entry_point": "dist/server.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/dist/server.js"],
+      "args": [
+        "${__dirname}/dist/server.js"
+      ],
       "env": {
         "MOODLE_URL": "${user_config.moodle_url}",
         "MOODLE_TOKEN": "${user_config.moodle_token}",
@@ -68,6 +70,10 @@
   },
   "tools": [
     {
+      "name": "moodle_plan_study",
+      "description": "Build a read-only study plan from one authorized task page. Ask for available time and course when missing. Keeps submission state, unknown coverage and page cursors. Never submits coursework or changes completion."
+    },
+    {
       "name": "moodle_list_courses",
       "description": "List current student enrolments with structured course IDs, dates and reported completion/progress. Missing progress is unknown. Optional offset/limit page the locally fetched enrolment list."
     },
@@ -85,7 +91,7 @@
     },
     {
       "name": "moodle_download_file",
-      "description": "Read an authorized course file by its opaque fileId. Default auto mode now returns extracted PDF/DOCX/PPTX/plain text with explicit pagination, avoiding dropped binary resources in gateways. mode=raw retains embedded bytes for capable clients; no raw URL or Moodle token is returned. Max file size remains configured. Scans are not OCRed. Reuse startPage/charOffset for continuation."
+      "description": "Read an authorized course file by its opaque fileId. Default auto mode now returns extracted PDF/DOCX/PPTX/plain text with explicit pagination, avoiding dropped binary resources in gateways. mode=raw retains embedded bytes for capable clients; no raw URL or Moodle token is returned. Max file size remains configured. Scans are not OCRed. For cached fileId-only clients, pass the returned nextFileId unchanged to read the next window; explicit startPage/charOffset is available with the original fileId."
     },
     {
       "name": "moodle_read_document",
@@ -101,7 +107,7 @@
     },
     {
       "name": "moodle_get_grades",
-      "description": "Get your full grade report for a course — all graded items, categories, percentages, and feedback."
+      "description": "Read the current student’s released course grade report with explicit item/course IDs, category IDs, raw/displayed values and feedback. Missing maximum/range stays null, never undefined or assumed 100; hidden values are withheld. This is not a projected final grade. Optional local offset/limit pagination. Never changes grades or emits a view event."
     },
     {
       "name": "moodle_get_calendar_events",
@@ -129,7 +135,7 @@
     },
     {
       "name": "moodle_get_notifications",
-      "description": "Get your recent Moodle notifications (grade returns, assignment feedback, forum replies, etc.). Unread items are marked with 🔵."
+      "description": "Read a bounded page of the current account’s popup notifications, unread count, text and safe context links. Does not mark read, emit read receipts or change preferences. limit defaults to 20 (max100); offset supports upstream paging. Missing or denied results are not reported as no notifications."
     },
     {
       "name": "moodle_get_activity_completion",
@@ -193,7 +199,10 @@
     }
   ],
   "compatibility": {
-    "platforms": ["darwin", "win32"],
+    "platforms": [
+      "darwin",
+      "win32"
+    ],
     "runtimes": {
       "node": ">=24.0.0"
     }

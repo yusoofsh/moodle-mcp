@@ -15,6 +15,11 @@ export const AUTH_META = {
 };
 /** The complete static catalog; importing tool handlers must not be needed to count policies. */
 export const TOOL_FUNCTIONS: Record<string, readonly string[]> = {
+  moodle_plan_study: [
+    "core_enrol_get_users_courses",
+    "mod_assign_get_assignments",
+    "mod_assign_get_submission_status",
+  ],
   moodle_get_site_info: [],
   moodle_list_courses: ["core_enrol_get_users_courses"],
   moodle_get_course: ["core_course_get_contents"],

@@ -1,3 +1,5 @@
+import { registerMaterialResources } from "../workflows/material-resources.js";
+import { registerWorkflowResources } from "../workflows/resources.js";
 import { reauthorize } from "../tools/download.js";
 import { registerStudyHub } from "../ui/study-hub.js";
 import { ResourceTemplate } from "@modelcontextprotocol/server";
@@ -63,6 +65,8 @@ export function registerResources(
   source: MoodleClientSource,
 ): void {
   registerStudyHub(server);
+  registerWorkflowResources(server);
+  registerMaterialResources(server, source);
   if (
     typeof source !== "function" &&
     (!source.supports("core_course_get_contents") ||
