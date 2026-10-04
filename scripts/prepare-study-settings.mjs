@@ -15,3 +15,10 @@ patch('src/workflows/study-plan.ts', '        return inputRequired({', '        
 patch('src/workflows/study-plan.ts', '                    title: "Days ahead",', '                    title: "Days ahead",\n                    ...(preferences ? { default: args.daysAhead ?? preferences.daysAhead } : {}),');
 patch('src/workflows/study-plan.ts', '                    title: "Study minutes per day",', '                    title: "Study minutes per day",\n                    ...(preferences ? { default: args.minutesPerDay ?? preferences.minutesPerDay } : {}),');
 patch('src/workflows/study-plan.ts', '                    title: "Course ID, or 0 for enrolled courses",', '                    title: "Course ID, or 0 for enrolled courses",\n                    ...(preferences ? { default: args.courseId ?? preferences.courseId } : {}),');
+const path = 'tests/discovery-http.test.ts';
+let test = readFileSync(path, 'utf8');
+if (test.split('Object.keys(TOOL_FUNCTIONS).length,').length !== 3) throw new Error('Expected both existing catalog assertions');
+test = test.replaceAll('Object.keys(TOOL_FUNCTIONS).length,', 'Object.keys(TOOL_FUNCTIONS).length + 2,');
+test = test.replace('      expect(tool.annotations.readOnlyHint).toBe(true);', '      expect(tool.annotations.readOnlyHint).toBe(tool.name !== "moodle_settings_update");');
+test = test.replace('    for (const tool of list.body.result.tools) {', '    expect(new Set(list.body.result.tools.map((tool: { name: string }) => tool.name))).toEqual(new Set([...Object.keys(TOOL_FUNCTIONS), "moodle_settings_read", "moodle_settings_update"]));\n    for (const tool of list.body.result.tools) {');
+writeFileSync(path, test);

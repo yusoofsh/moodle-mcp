@@ -26,14 +26,14 @@ jobs:
         run: |
           node scripts/prepare-study-settings.mjs
           git rm scripts/prepare-study-settings.mjs .github/workflows/prepare-study-settings.yml
-          bunx --no-install prettier --write src/workflows/settings.ts src/workflows/study-plan.ts src/register-tools.ts src/app-core.ts tests/study-settings.test.ts
+          bunx --no-install prettier --write src/workflows/settings.ts src/workflows/study-plan.ts src/register-tools.ts src/app-core.ts tests/study-settings.test.ts tests/discovery-http.test.ts
       - name: Verify all source tests and the Worker artifact
         run: bun run check && bun run test && bun run build && bun run workers:build
       - name: Commit the tested source changes on this branch only
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/workflows/settings.ts src/workflows/study-plan.ts src/register-tools.ts src/app-core.ts tests/study-settings.test.ts
+          git add src/workflows/settings.ts src/workflows/study-plan.ts src/register-tools.ts src/app-core.ts tests/study-settings.test.ts tests/discovery-http.test.ts
           git diff --cached --check
           git commit -m 'Wire persistent study preferences after source and Worker checks'
           git push origin HEAD:refs/heads/feat/persistent-study-settings-20261004
