@@ -1,4 +1,5 @@
 import { reauthorize } from "../tools/download.js";
+import { registerStudyHub } from "../ui/study-hub.js";
 import { ResourceTemplate } from "@modelcontextprotocol/server";
 import type { McpServer } from "@modelcontextprotocol/server";
 import {
@@ -61,6 +62,7 @@ export function registerResources(
   server: McpServer,
   source: MoodleClientSource,
 ): void {
+  registerStudyHub(server);
   if (
     typeof source !== "function" &&
     (!source.supports("core_course_get_contents") ||

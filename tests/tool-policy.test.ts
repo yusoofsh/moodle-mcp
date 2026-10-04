@@ -77,7 +77,9 @@ describe("read-only tools and file access", () => {
       downloadFile,
     } as unknown as MoodleClient;
     registerResources({ registerResource } as unknown as McpServer, client);
-    const handler = registerResource.mock.calls[0][3];
+    const handler = registerResource.mock.calls.find(
+      ([name]) => name === "moodle-course-files",
+    )![3];
     await expect(
       handler(new URL("moodle://files/f_test"), { fileId: "f_test" }),
     ).rejects.toThrow("Access denied");

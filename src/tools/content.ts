@@ -1,3 +1,4 @@
+import { studyHubMetadata } from "../ui/study-hub.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClientSource } from "../moodle-source.js";
@@ -62,7 +63,7 @@ export function registerContentTools(
           .strict(),
         outputSchema: contentOutputs.moodle_get_dashboard,
         annotations: READ_ONLY,
-        _meta: AUTH_META,
+        _meta: { ...AUTH_META, ...studyHubMetadata },
       },
       async (options) =>
         toolResult(
