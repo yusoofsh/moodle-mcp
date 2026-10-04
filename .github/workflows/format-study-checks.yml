@@ -1,0 +1,31 @@
+name: Format Study Hub checks
+on:
+  push:
+    branches: [feat/study-hub-extension-20261004]
+    paths: [.github/workflows/format-study-checks.yml]
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.repository == 'yusoofsh/moodle-mcp' && github.ref == 'refs/heads/feat/study-hub-extension-20261004'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Format reviewed scripts and remove this one-time workflow
+        run: |
+          bunx --no-install prettier --write scripts/check-upstream.mjs scripts/test-study-hub-browser.mjs
+          git rm .github/workflows/format-study-checks.yml
+          bun run format:check
+      - name: Commit only formatting to the feature branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/check-upstream.mjs scripts/test-study-hub-browser.mjs
+          git diff --cached --check
+          git commit -m 'Format the upstream and browser checks without changing behavior'
+          git push origin HEAD:refs/heads/feat/study-hub-extension-20261004
