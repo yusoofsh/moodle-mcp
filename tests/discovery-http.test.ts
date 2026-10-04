@@ -72,12 +72,25 @@ describe("authenticated HTTP discovery during Moodle outage", () => {
     const list = await post("tools/list", {});
     expect(list.status, list.text).toBe(200);
     expect(list.body.result.tools).toHaveLength(
-      Object.keys(TOOL_FUNCTIONS).length,
+      Object.keys(TOOL_FUNCTIONS).length + 2,
+    );
+    expect(
+      new Set(
+        list.body.result.tools.map((tool: { name: string }) => tool.name),
+      ),
+    ).toEqual(
+      new Set([
+        ...Object.keys(TOOL_FUNCTIONS),
+        "moodle_settings_read",
+        "moodle_settings_update",
+      ]),
     );
     for (const tool of list.body.result.tools) {
       expect(tool).not.toHaveProperty("execution");
       expect(tool.inputSchema.type).toBe("object");
-      expect(tool.annotations.readOnlyHint).toBe(true);
+      expect(tool.annotations.readOnlyHint).toBe(
+        tool.name !== "moodle_settings_update",
+      );
       expect(tool._meta.securitySchemes).toEqual([
         { type: "oauth2", scopes: ["moodle:read"] },
       ]);
@@ -95,7 +108,7 @@ describe("authenticated HTTP discovery during Moodle outage", () => {
     expect(call.body.result.isError).toBe(true);
     expect(call.text).not.toContain("DO-NOT-DISCLOSE");
     expect((await post("tools/list", {})).body.result.tools).toHaveLength(
-      Object.keys(TOOL_FUNCTIONS).length,
+      Object.keys(TOOL_FUNCTIONS).length + 2,
     );
   });
 });

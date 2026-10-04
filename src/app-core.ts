@@ -1,3 +1,4 @@
+import { studyPreferenceStore } from "./workflows/settings.js";
 import express, { type ErrorRequestHandler } from "express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
@@ -218,7 +219,11 @@ export function createAppWithStore(
       return;
     }
     const server = new McpServer({ name: "moodle-mcp", version: "0.10.5" });
-    registerAllTools(server, getClient);
+    registerAllTools(
+      server,
+      getClient,
+      studyPreferenceStore(store, config.ownerId),
+    );
     registerResources(server, getClient);
     registerPrompts(server);
     // Events are handled after the same bearer middleware as tools.

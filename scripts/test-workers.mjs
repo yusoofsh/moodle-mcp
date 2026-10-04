@@ -796,7 +796,7 @@ try {
     assert.equal((await exchange(id, replay)).status, 400);
   });
   await check(
-    "MCP initialize, all 21 read-only tools, Moodle request",
+    "MCP initialize, original read tools, local settings and Moodle request",
     async () => {
       const init = await rpc(granted.access_token, "initialize", {
         protocolVersion: "2025-11-25",
@@ -806,12 +806,20 @@ try {
       assert.equal(init.status, 200, init.text);
       const tools = await rpc(granted.access_token, "tools/list", {});
       assert.equal(tools.status, 200, tools.text);
-      assert.equal(
-        tools.json.result.tools.length,
-        Object.keys(TOOL_FUNCTIONS).length,
+      assert.deepEqual(
+        new Set(tools.json.result.tools.map((tool) => tool.name)),
+        new Set([
+          ...Object.keys(TOOL_FUNCTIONS),
+          "moodle_settings_read",
+          "moodle_settings_update",
+        ]),
       );
       assert.ok(
-        tools.json.result.tools.every((t) => t.annotations.readOnlyHint),
+        tools.json.result.tools.every(
+          (tool) =>
+            tool.annotations.readOnlyHint ===
+            (tool.name !== "moodle_settings_update"),
+        ),
       );
       const result = await rpc(granted.access_token, "tools/call", {
         name: "moodle_list_courses",
@@ -820,6 +828,50 @@ try {
       assert.equal(result.status, 200, result.text);
       assert.match(result.text, /Sample course/);
       assert.ok(!result.text.includes(bindings.MOODLE_TOKEN));
+    },
+  );
+  await check(
+    "private study settings persist between authenticated Worker requests",
+    async () => {
+      const read = () =>
+        rpc(granted.access_token, "tools/call", {
+          name: "moodle_settings_read",
+          arguments: {},
+        });
+      const original = await read();
+      assert.equal(original.status, 200, original.text);
+      assert.deepEqual(original.json.result.structuredContent.values, {
+        daysAhead: 7,
+        minutesPerDay: 45,
+        courseId: 0,
+      });
+      const changed = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_settings_update",
+        arguments: { set: { daysAhead: 14, minutesPerDay: 30 } },
+      });
+      assert.equal(changed.status, 200, changed.text);
+      assert.deepEqual(changed.json.result.structuredContent.values, {
+        daysAhead: 14,
+        minutesPerDay: 30,
+        courseId: 0,
+      });
+      assert.deepEqual((await read()).json.result.structuredContent.values, {
+        daysAhead: 14,
+        minutesPerDay: 30,
+        courseId: 0,
+      });
+      const denied = await rpc(granted.access_token, "tools/call", {
+        name: "moodle_settings_update",
+        arguments: { set: { owner: "other" } },
+      });
+      assert.ok(denied.json.error || denied.json.result?.isError);
+      assert.deepEqual((await read()).json.result.structuredContent.values, {
+        daysAhead: 14,
+        minutesPerDay: 30,
+        courseId: 0,
+      });
+      for (const text of [original.text, changed.text, denied.text])
+        assert.ok(!text.includes(bindings.MOODLE_TOKEN));
     },
   );
   await check(
@@ -1185,7 +1237,7 @@ try {
       assert.equal(listing.status, 200, listing.text);
       assert.equal(
         listing.json.result.tools.length,
-        Object.keys(TOOL_FUNCTIONS).length,
+        Object.keys(TOOL_FUNCTIONS).length + 2,
       );
       for (const tool of listing.json.result.tools) {
         assert.ok(
@@ -1238,7 +1290,10 @@ try {
       try {
         await sdkClient.connect(transport);
         const listing = await sdkClient.listTools();
-        assert.equal(listing.tools.length, Object.keys(TOOL_FUNCTIONS).length);
+        assert.equal(
+          listing.tools.length,
+          Object.keys(TOOL_FUNCTIONS).length + 2,
+        );
         const result = await sdkClient.callTool({
           name: "moodle_list_courses",
           arguments: {},
@@ -1260,7 +1315,7 @@ try {
       assert.equal(listing.status, 200);
       assert.equal(
         listing.json.result.tools.length,
-        Object.keys(TOOL_FUNCTIONS).length,
+        Object.keys(TOOL_FUNCTIONS).length + 2,
       );
       const denied = await rpc(granted.access_token, "tools/call", {
         name: "moodle_list_courses",
@@ -1291,7 +1346,7 @@ try {
     assert.equal(result.status, 200, result.text);
     assert.equal(
       result.json.result.tools.length,
-      Object.keys(TOOL_FUNCTIONS).length,
+      Object.keys(TOOL_FUNCTIONS).length + 2,
     );
   });
   await check("refresh rotation and replay family revocation", async () => {
