@@ -17,6 +17,9 @@ const after = `      assert.deepEqual(
       );`;
 if (source.split(before).length !== 2) throw new Error('Expected the existing Worker catalog assertion');
 source = source.replace(before, after).replace('MCP initialize, all 21 read-only tools, Moodle request', 'MCP initialize, original read tools, local settings and Moodle request');
+const count = 'Object.keys(TOOL_FUNCTIONS).length';
+if (source.split(count).length !== 5) throw new Error('Expected all four remaining restricted/restart/client catalog checks');
+source = source.replaceAll(count, count + ' + 2');
 const marker = '  await check(\n    "authenticated URL resolution and batch resource enrichment stay read-only",';
 if (source.split(marker).length !== 2) throw new Error('Expected the existing URL read boundary');
 source = source.replace(marker, `  await check("private study settings persist between authenticated Worker requests", async () => {
