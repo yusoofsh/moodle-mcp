@@ -2,9 +2,12 @@ name: Prepare Study Hub
 on:
   push:
     branches: [feat/study-hub-extension-20261004]
-    paths: [.github/workflows/prepare-study-hub.yml]
+    paths: [.github/workflows/prepare-study-hub.yml, scripts/prepare-study-hub.mjs]
 permissions:
   contents: write
+concurrency:
+  group: prepare-study-hub
+  cancel-in-progress: true
 jobs:
   prepare:
     if: github.repository == 'yusoofsh/moodle-mcp' && github.ref == 'refs/heads/feat/study-hub-extension-20261004'
