@@ -68,7 +68,7 @@ describe("MCP discovery is independent from Moodle availability", () => {
     expect((await client.listPrompts()).prompts.length).toBeGreaterThan(0);
     expect(
       (await client.listResourceTemplates()).resourceTemplates.length,
-    ).toBe(1);
+    ).toBe(3);
     expect(create).not.toHaveBeenCalled();
   });
   it("reports an upstream failure as a tool error, not a broken discovery handshake", async () => {
@@ -127,8 +127,16 @@ describe("MCP discovery is independent from Moodle availability", () => {
     const network = vi.spyOn(actual, "call");
     const client = await fixture(async () => actual);
     expect(
-      (await client.listResourceTemplates()).resourceTemplates,
-    ).toHaveLength(1);
+      (await client.listResourceTemplates()).resourceTemplates.map(
+        (t) => t.uriTemplate,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "moodle://files/{fileId}",
+        "moodle://study-manifest/{courseId}",
+        "moodle://activity/{courseId}/{cmid}",
+      ]),
+    );
     await expect(
       client.readResource({ uri: "moodle://files/example" }),
     ).rejects.toThrow(/cannot read/);

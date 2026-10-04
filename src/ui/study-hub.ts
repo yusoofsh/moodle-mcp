@@ -1,3 +1,4 @@
+import { appRoute } from "./deep-link.js";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { appStyles } from "./styles.js";
 import { appBridge } from "./bridge.js";
@@ -43,6 +44,7 @@ export const studyHubHtml = `<!doctype html><html lang="en"><head><meta charset=
 <p class="muted">Visible activity progress is separate from course completion. A past opening event is not proof of an overdue submission. Material search is metadata search, not a full-text file index.</p>
 </main><script type="module">
 const appName='moodle-study-hub';
+const appRoute=${String(appRoute)};let requestedCourse=null;
 const allowedTools=new Set(['moodle_get_dashboard','moodle_get_tasks','moodle_search_materials']);
 let activeView='overview', lastArgs={}, nextArgs=null, nextEventArgs=null, selectedText='', hasSnapshot=false;
 const names={overview:'moodle_get_dashboard',tasks:'moodle_get_tasks',materials:'moodle_search_materials'};
@@ -69,5 +71,6 @@ async function load(view,args){if(busy)return;activeView=view;lastArgs=args;sele
 function refresh(view=activeView){const days=Number(byId('days').value);const args=view==='materials'?{query:byId('query').value.trim(),maxCourses:3,limit:20}:view==='tasks'?{daysAhead:days,maxCourses:3,limit:10}:{daysAhead:days,maxCourses:3,eventLimit:20};if(view==='materials'&&!args.query){notice('Enter a material name or topic first.');return;}void load(view,args);}
 for(const tab of ['overview','tasks','materials'])byId(tab).addEventListener('click',()=>refresh(tab));
 byId('refresh').addEventListener('click',()=>refresh());byId('query').addEventListener('keydown',event=>{if(event.key==='Enter')refresh('materials');});byId('next').addEventListener('click',()=>{if(nextArgs)void load(activeView,nextArgs);});byId('next-events').addEventListener('click',()=>{if(nextEventArgs)void load('overview',nextEventArgs);});
-function onReady(){if(!hasSnapshot)refresh('overview');}
+function onDeepLink(value){const route=appRoute(value);if(route?.kind==='course'){requestedCourse=Number(route.id);if(ready&&!busy)void load('overview',{courseId:requestedCourse,daysAhead:7,maxCourses:1,eventLimit:20});}}
+function onReady(){if(requestedCourse)void load('overview',{courseId:requestedCourse,daysAhead:7,maxCourses:1,eventLimit:20});else if(!hasSnapshot)refresh('overview');}
 </script></body></html>`;
