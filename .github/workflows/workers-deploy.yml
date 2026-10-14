@@ -5,6 +5,8 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  CF_SEND_TELEMETRY: "false"
 concurrency:
   group: cloudflare-production
   cancel-in-progress: false

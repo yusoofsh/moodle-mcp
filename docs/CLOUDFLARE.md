@@ -24,7 +24,7 @@ git clone https://github.com/yusoofsh/moodle-mcp.git
 cd moodle-mcp
 bun install --frozen-lockfile --ignore-scripts
 bun run build
-bunx --no-install wrangler login
+bunx --no-install cf auth login
 bun run workers:deploy
 ```
 

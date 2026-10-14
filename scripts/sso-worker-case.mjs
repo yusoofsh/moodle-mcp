@@ -28,7 +28,7 @@ async function start() {
     https: true,
     stripCfConnectingIp: false,
     modules: true,
-    scriptPath: ".wrangler/build/worker.js",
+    scriptPath: ".cloudflare/output/v0/workers/default/bundle/worker.js",
     compatibilityDate: "2026-09-23",
     compatibilityFlags: ["nodejs_compat", "global_fetch_strictly_public"],
     durableObjects: { MOODLE_MCP: { className: "MoodleMcp", useSQLite: true } },

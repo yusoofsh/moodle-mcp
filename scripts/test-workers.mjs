@@ -60,7 +60,7 @@ async function start(override = {}) {
     ...(browserMode ? { port: 3000 } : {}),
     modules: true,
     stripCfConnectingIp: false,
-    scriptPath: ".wrangler/build/worker.js",
+    scriptPath: ".cloudflare/output/v0/workers/default/bundle/worker.js",
     compatibilityDate: "2026-09-23",
     compatibilityFlags: ["nodejs_compat", "global_fetch_strictly_public"],
     durableObjects: { MOODLE_MCP: { className: "MoodleMcp", useSQLite: true } },
@@ -706,7 +706,9 @@ async function check(name, fn) {
 }
 try {
   await check("bundle fits Free plan and excludes node:sqlite", async () => {
-    const bundle = await readFile(".wrangler/build/worker.js");
+    const bundle = await readFile(
+      ".cloudflare/output/v0/workers/default/bundle/worker.js",
+    );
     const bytes = gzipSync(bundle).length;
     assert.ok(bytes < 3 * 1024 * 1024, `Gzipped bundle ${bytes} exceeds 3 MiB`);
     assert.ok(!bundle.toString().includes("node:sqlite"));

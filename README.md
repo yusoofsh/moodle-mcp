@@ -75,7 +75,7 @@ bun install --frozen-lockfile --ignore-scripts
 bun run build
 bun run password:hash --workers
 openssl rand -hex 32
-bunx --no-install wrangler login
+bunx --no-install cf auth login
 bun run workers:deploy
 ```
 
