@@ -45,12 +45,12 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260923.1",
-    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/client": "2.3.1",
     "@types/express": "5.0.6",
     "@types/node": "^24.0.0",
     "@types/oidc-provider": "9.12.1",
     "@types/supertest": "^7.0.0",
-    "miniflare": "5.20260921.0-alpha",
+    "miniflare": "5.20261006.2-beta",
     "playwright": "1.63.0",
     "prettier": "3.9.9",
     "supertest": "^7.2.2",
@@ -81,6 +81,7 @@
   },
   "packageManager": "bun@1.4.2",
   "overrides": {
-    "undici": "7.29.1"
+    "undici": "7.29.1",
+    "source-map-js": "1.2.2"
   }
 }
