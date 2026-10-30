@@ -17,6 +17,7 @@ export function registerUrlTools(
   server.registerTool(
     "moodle_resolve_url",
     {
+      title: "Moodle Resolve URL",
       description:
         "Resolve a visible Moodle URL activity to its actual HTTP(S) externalurl (for example a YouTube recording), not the mod/url/view.php wrapper. moduleId is the course-module/activity ID, not the URL instance ID. Optional courseId avoids a module-lookup API call. Returns structured data and equivalent JSON text; resolved=false explains missing capabilities or unavailable targets. Does not fetch, transcribe, or follow the external site and never forwards Moodle credentials.",
       inputSchema: z.object({

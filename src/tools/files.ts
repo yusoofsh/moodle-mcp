@@ -176,6 +176,7 @@ export function registerFileTools(
     server.registerTool(
       "moodle_list_resources",
       {
+        title: "Moodle List Resources",
         description:
           "List all downloadable files and links in a course, grouped by the course's own sections (weeks, chapters, topics — as defined by the professor). Each file gets an opaque fileId you pass to moodle_download_file to read contents. URL activities include their actual externalurl and moduleId when Moodle permits resolution, with the activity wrapper kept separately. Missing targets are labelled unresolved. External sites are not fetched.",
         inputSchema: z.object({

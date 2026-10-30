@@ -25,6 +25,7 @@ export function registerDownloadTool(
     server.registerTool(
       "moodle_download_file",
       {
+        title: "Moodle Download File",
         description:
           "Read an authorized course file by its opaque fileId. Default auto mode now returns extracted PDF/DOCX/PPTX/plain text with explicit pagination, avoiding dropped binary resources in gateways. mode=raw retains embedded bytes for capable clients; no raw URL or Moodle token is returned. Max file size remains configured. Scans are not OCRed. For cached fileId-only clients, pass the returned nextFileId unchanged to read the next window; explicit startPage/charOffset is available with the original fileId.",
         inputSchema: documentWindow
@@ -76,6 +77,7 @@ export function registerDownloadTool(
     server.registerTool(
       "moodle_read_document",
       {
+        title: "Moodle Read Document",
         description:
           "Extract bounded PDF, DOCX, PPTX or plain-text content using an opaque authorized fileId. PDF pages and slide order preserved; DOCX uses one logical document. No scripts/macros, remote assets, OCR, image/table rendering. Truncation and page/character continuation explicit. Extraction is single-flight.",
         inputSchema: documentWindow.extend({ fileId: fileIdSchema }).strict(),

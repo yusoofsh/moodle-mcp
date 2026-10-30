@@ -31,6 +31,7 @@ export function registerForumTools(
     server.registerTool(
       "moodle_list_forums",
       {
+        title: "Moodle List Forums",
         description:
           "List visible course forums with correct instance forumId (not cmid), separate course-module ID, type and readable introduction. Optional bounded local pagination. Never views/marks a forum or subscribes.",
         inputSchema: z.object({ courseId: idSchema, ...pageShape }).strict(),
@@ -51,6 +52,7 @@ export function registerForumTools(
     server.registerTool(
       "moodle_get_forum_discussions",
       {
+        title: "Moodle Get Forum Discussions",
         description:
           "Read a page of permitted forum discussions with discussionId, firstPostId, author, readable first-post body and links. forumId is the instance ID from moodle_list_forums, not cmid. Use moodle_get_forum_thread(discussionId) for replies. Preserves Moodle groups/timed/Q&A restrictions; no read receipts, view events or writes.",
         inputSchema: z
@@ -78,6 +80,7 @@ export function registerForumTools(
     server.registerTool(
       "moodle_get_forum_thread",
       {
+        title: "Moodle Get Forum Thread",
         description:
           "Read permitted posts/replies in one discussion with parent IDs, readable text and safe links. Revalidates the current forum context, excludes deleted/non-viewable posts, and never marks anything as read or posts a reply. Attachment metadata only; attachment bytes are not yet supported. offset/limit are local output pagination; upstream response remains bounded.",
         inputSchema: z

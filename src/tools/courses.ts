@@ -155,6 +155,7 @@ export function registerCourseTools(
     server.registerTool(
       "moodle_list_courses",
       {
+        title: "Moodle List Courses",
         description:
           "List current student enrolments with structured course IDs, dates and reported completion/progress. Missing progress is unknown. Optional offset/limit page the locally fetched enrolment list.",
         inputSchema: z.object(pageShape).strict(),
@@ -174,6 +175,7 @@ export function registerCourseTools(
     server.registerTool(
       "moodle_get_course",
       {
+        title: "Moodle Get Course",
         description:
           "Read current visible sections/modules with distinct cmid and instanceId, restrictions, dates and reported activity completion. Includes a visible-activity progress summary and Attendance activity count; no state changes. Returns structured JSON and equivalent text.",
         inputSchema: z.object({ courseId: idSchema, ...pageShape }).strict(),

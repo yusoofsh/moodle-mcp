@@ -117,7 +117,7 @@ export function registerStudySettings(
   server.registerTool(
     readTool,
     {
-      title: "Study preferences",
+      title: "Study Preferences",
       description:
         "Read local non-secret study preferences. These prefill guided planning choices without accepting them or reading Moodle data.",
       inputSchema: z.object({}).strict(),
@@ -165,7 +165,7 @@ export function registerStudySettings(
   server.registerTool(
     updateTool,
     {
-      title: "Save study preferences",
+      title: "Save Study Preferences",
       description:
         "Persist the supplied local study defaults for the authenticated owner. Omitted fields stay unchanged. This does not submit work, update completion, change Moodle data, or grant access to a course.",
       inputSchema: patchSchema,

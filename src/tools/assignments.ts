@@ -36,6 +36,7 @@ export function registerAssignmentTools(
     server.registerTool(
       "moodle_list_assignments",
       {
+        title: "Moodle List Assignments",
         description:
           "Read visible course assignments with correct assignmentId/instanceId and cmid, effective due/open/cutoff dates in Unix seconds and ISO UTC, grading type, explicit unknown states and warnings. Structured JSON is authoritative; text is included for gateways. Optional offset/limit paginate the locally fetched visible list. Does not submit or change anything.",
         inputSchema: z
@@ -61,6 +62,7 @@ export function registerAssignmentTools(
     server.registerTool(
       "moodle_get_assignment",
       {
+        title: "Moodle Get Assignment",
         description:
           "Read the authenticated student’s latest assignment submission/team status, individual deadline extension and released grade feedback. Uses assignmentId (not cmid). Missing results stay unknown rather than Not submitted. Returns structured JSON and text; no submission or grading actions.",
         inputSchema: z

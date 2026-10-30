@@ -23,6 +23,7 @@ export function registerStudentTools(
     server.registerTool(
       "moodle_get_activity_completion",
       {
+        title: "Moodle Get Activity Completion",
         description:
           "Read the current student’s activity completion for visible course modules, with manual/automatic/not-tracked/unknown distinctions, completion rules and a scoped progress summary. Attempts the completion read API and falls back to already-authorized course-content completion fields. Never marks completion. Does not accept another userId.",
         inputSchema: z.object({ courseId: idSchema, ...pageShape }).strict(),
@@ -43,6 +44,7 @@ export function registerStudentTools(
     server.registerTool(
       "moodle_get_course_completion",
       {
+        title: "Moodle Get Course Completion",
         description:
           "Read Moodle’s course-completion decision and criteria for the authenticated student. This is distinct from an activity percentage. Not configured, forbidden, unavailable and incomplete remain different states. Never self-completes a course and never accepts another userId.",
         inputSchema: z.object({ courseId: idSchema }).strict(),
@@ -62,6 +64,7 @@ export function registerStudentTools(
     server.registerTool(
       "moodle_get_attendance",
       {
+        title: "Moodle Get Attendance",
         description:
           "Read visible Attendance activity inventory for a course. Supply moduleId (cmid) to attempt the plugin’s advertised session-read API for that one activity; return only the current student’s records when Moodle permits. Missing API or denied permissions are reported explicitly, never as absent. No attendance marking, QR/password processing or mobile-content handler calls (mobile views can auto-mark presence).",
         inputSchema: z

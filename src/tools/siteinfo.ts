@@ -22,6 +22,7 @@ export function registerSiteInfoTool(
   server.registerTool(
     "moodle_get_site_info",
     {
+      title: "Moodle Get Site Info",
       description:
         "Read Moodle site/current account information and the backend tool catalog with required/optional Web Service advertisement. Includes completion and Attendance API diagnostics. Advertised is not proof of role/context authorization; a connector may cache an older catalog. Never returns tokens.",
       inputSchema: z.object({}).strict(),

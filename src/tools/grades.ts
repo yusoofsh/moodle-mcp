@@ -24,6 +24,7 @@ export function registerGradeTools(
   server.registerTool(
     "moodle_get_grades",
     {
+      title: "Moodle Get Grades",
       description:
         "Read the current student’s released course grade report with explicit item/course IDs, category IDs, raw/displayed values and feedback. Missing maximum/range stays null, never undefined or assumed 100; hidden values are withheld. This is not a projected final grade. Optional local offset/limit pagination. Never changes grades or emits a view event.",
       inputSchema: z.object({ courseId: idSchema, ...pageShape }).strict(),

@@ -149,6 +149,7 @@ export function registerQuizTools(
     server.registerTool(
       "moodle_list_quizzes",
       {
+        title: "Moodle List Quizzes",
         description:
           "List all quizzes in a course, grouped by section, with time limits, attempt counts, and open/close dates.",
         inputSchema: z.object({
@@ -174,6 +175,7 @@ export function registerQuizTools(
     server.registerTool(
       "moodle_get_quiz_attempts",
       {
+        title: "Moodle Get Quiz Attempts",
         description:
           "Get your past attempt history for a specific quiz — grades, states, and timing.",
         inputSchema: z.object({

@@ -26,6 +26,7 @@ export function registerCalendarTools(
   server.registerTool(
     "moodle_get_calendar_events",
     {
+      title: "Moodle Get Calendar Events",
       description:
         "Read current-user Moodle action events in a bounded window (default next 30 days), with ISO UTC dates, course IDs, past/upcoming distinction and upstream pagination. Optional courseId uses course-specific API pagination. Reuse returned from/to and afterEventId for next page. This is an action timeline, not all personal/group/site calendar entries; past opening events are not automatically overdue tasks. Never creates or edits events.",
       inputSchema: z
