@@ -27,6 +27,7 @@ export function registerNotificationTools(
   server.registerTool(
     "moodle_get_notifications",
     {
+      title: "Moodle Get Notifications",
       description:
         "Read a bounded page of the current account’s popup notifications, unread count, text and safe context links. Does not mark read, emit read receipts or change preferences. limit defaults to 20 (max100); offset supports upstream paging. Missing or denied results are not reported as no notifications.",
       inputSchema: notificationInput,

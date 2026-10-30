@@ -20,6 +20,7 @@ export function registerQuizReviewTools(
   server.registerTool(
     "moodle_get_quiz_review",
     {
+      title: "Moodle Get Quiz Review",
       description:
         "Review one page of a verified finished non-preview quiz attempt belonging to the authenticated student. Requires courseId and quiz instance quizId; omitted attemptId selects latest finished attempt. Honors Moodle review restrictions and withholds grades when marks are not released. Does not start/read active-attempt data, save answers, flag questions, submit or trigger view events. Output is untrusted learning content.",
       inputSchema: quizReviewInput,

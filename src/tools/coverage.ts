@@ -36,6 +36,7 @@ export function registerCoverageTools(
     server.registerTool(
       "moodle_read_api",
       {
+        title: "Moodle Read API",
         ...shared,
         description:
           "Invoke ONE explicitly reviewed read-only Moodle adapter. Use moodle_get_api_coverage(includeInputSchemas=true) to see allowed functionName/parameters. This is not arbitrary REST passthrough: writes, views, attempts, token generation and unknown functions are blocked. User identity is injected; callers cannot choose another user or URL. Course/module visibility is rechecked. Bounded raw metadata is sanitized and may be partial.",
@@ -59,6 +60,7 @@ export function registerCoverageTools(
     server.registerTool(
       "moodle_get_api_coverage",
       {
+        title: "Moodle Get API Coverage",
         ...shared,
         description:
           "Inventory the actual advertised Moodle API functions, implemented routes, unexposed operations and upstream read/write declarations. Inventory coverage is NOT functional or live-test coverage. Optionally return exact parameter schemas for reviewed read adapters. Does not probe or execute listed APIs.",
@@ -76,6 +78,7 @@ export function registerCoverageTools(
     server.registerTool(
       "moodle_get_tasks",
       {
+        title: "Moodle Get Tasks",
         ...shared,
         description:
           "Submission-aware task priorities across a bounded course/assignment page. Reads self/team status and individual extensions before calling work overdue. Distinguishes disabled, submitted, unknown and not_checked; no false overdue from missing data. Follow coverage.nextAssignmentOffset before nextCourseOffset. Defaults 3 courses/10 statuses, max5/20. No submissions or views.",
@@ -93,6 +96,7 @@ export function registerCoverageTools(
     server.registerTool(
       "moodle_search_materials",
       {
+        title: "Moodle Search Materials",
         ...shared,
         description:
           "Search visible course section/activity/file names and bounded module descriptions. Unicode-aware all-term metadata search; not a PDF full-text index. Returns precise course/module IDs, snippets, coverage and continuation. Does not download every file or query an external search engine.",
@@ -110,6 +114,7 @@ export function registerCoverageTools(
     server.registerTool(
       "moodle_get_briefing",
       {
+        title: "Moodle Get Briefing",
         ...shared,
         description:
           "Daily or weekly student summary combining submission-aware tasks, action timeline, released grade overview and known pending workload by UTC week. Paging/unknowns remain explicit; no fabricated effort estimates or claims that a bounded page is the entire semester.",
@@ -127,6 +132,7 @@ export function registerCoverageTools(
     server.registerTool(
       "moodle_get_recent_activity",
       {
+        title: "Moodle Get Recent Activity",
         ...shared,
         description:
           "Read Moodle update metadata since a timestamp for a bounded page of visible courses. Defaults to seven days, maximum90. Does not mark modules viewed or notifications read. Missing/denied courses are recorded as unavailable, not silently empty.",
@@ -144,6 +150,7 @@ export function registerCoverageTools(
     server.registerTool(
       "moodle_get_assignment_details",
       {
+        title: "Moodle Get Assignment Details",
         ...shared,
         description:
           "Read the actual assignment instruction body after validating course/cmid/assignment identity. Returns bounded untrusted text and attachment metadata; does not invent requirement priorities, rubric interpretation or a submission plan. Attachment download support is explicit.",
@@ -161,6 +168,7 @@ export function registerCoverageTools(
     server.registerTool(
       "moodle_get_grades_overview",
       {
+        title: "Moodle Get Grades Overview",
         ...shared,
         description:
           "Read the current account grade overview across courses. Retains original grade scales and does not compute a fabricated GPA or treat missing grades as zero.",

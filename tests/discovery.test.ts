@@ -7,6 +7,9 @@ import { registerPrompts } from "../src/prompts/index.js";
 import { TOOL_FUNCTIONS } from "../src/tool-policy.js";
 import { MoodleClient } from "../src/moodle-client.js";
 
+/** Capitalized words; short connectors may stay lower case after the first word. */
+const TITLE_CASE =
+  /^[A-Z][A-Za-z]*(?: (?:[A-Z][A-Za-z]*|a|an|and|for|of|the|to))*$/;
 const instances: { server: McpServer; client: Client }[] = [];
 afterEach(async () => {
   for (const x of instances.splice(0)) {
@@ -70,6 +73,12 @@ describe("MCP discovery is independent from Moodle availability", () => {
       (await client.listResourceTemplates()).resourceTemplates.length,
     ).toBe(3);
     expect(create).not.toHaveBeenCalled();
+  });
+  it("gives every tool a Title Case display title", async () => {
+    const client = await fixture(vi.fn());
+    const { tools } = await client.listTools();
+    expect(tools.length).toBeGreaterThan(0);
+    for (const tool of tools) expect(tool.title).toMatch(TITLE_CASE);
   });
   it("reports an upstream failure as a tool error, not a broken discovery handshake", async () => {
     const client = await fixture(

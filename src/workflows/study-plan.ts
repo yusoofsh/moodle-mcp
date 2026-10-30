@@ -90,7 +90,7 @@ export function registerStudyPlan(
   server.registerTool(
     "moodle_plan_study",
     {
-      title: "Plan a study window",
+      title: "Plan a Study Window",
       description:
         "Build a read-only study plan from one authorized task page. Ask for available time and course when missing. Keeps submission state, unknown coverage and page cursors. Never submits coursework or changes completion.",
       inputSchema: studyPlanInput,
