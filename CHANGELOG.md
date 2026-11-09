@@ -1,3 +1,7 @@
+# Unreleased
+
+- `moodle_call_api` and the reviewed read adapters now redact credential-named result fields, including `userprivateaccesskey` returned by `core_webservice_get_site_info`.
+
 # 0.11.0 — Read/write access and a refreshed sign-in
 
 - Add the `moodle:write` OAuth scope and `moodle_call_api`, which calls any Web Service function the Moodle token advertises. The owner opts in per connection with an unchecked-by-default box on the consent page; read-only stays the default. Credential-issuing functions are blocked.

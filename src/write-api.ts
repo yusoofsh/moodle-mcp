@@ -1,5 +1,6 @@
 import type { MoodleClient } from "./moodle-client.js";
 import { MoodleApiError } from "./moodle-errors.js";
+import { SECRET_KEY } from "./student/safe-api.js";
 import {
   packet,
   upstreamWarnings,
@@ -77,6 +78,17 @@ export interface WriteResult {
   preview?: string;
 }
 
+/** Replaces credential-named fields (for example `userprivateaccesskey`) in a parsed result. */
+function scrubSecretFields(value: unknown, key = ""): unknown {
+  if (SECRET_KEY.test(key.replace(/[_-]/g, ""))) return "[redacted]";
+  if (Array.isArray(value)) return value.map((item) => scrubSecretFields(item));
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, scrubSecretFields(v, k)]),
+    );
+  return value;
+}
+
 /** Calls any Web Service function the token advertises, apart from the blocked credential functions. */
 export async function invokeWriteOperation(
   client: MoodleClient,
@@ -108,7 +120,7 @@ export async function invokeWriteOperation(
       `Moodle could not run ${functionName}. The change may already have been applied; read the current state before retrying.`,
     );
   }
-  const json = client.redact(JSON.stringify(raw ?? null));
+  const json = client.redact(JSON.stringify(scrubSecretFields(raw ?? null)));
   const truncated = json.length > MAX_PREVIEW_CHARS;
   const data: WriteResult = {
     functionName,

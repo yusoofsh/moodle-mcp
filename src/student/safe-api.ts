@@ -395,8 +395,9 @@ for (const [moduleType, resultKey, functionName] of activityFamilies) {
 Object.assign(READ_OPERATIONS, ACTIVITY_READS, ACCOUNT_READS);
 Object.freeze(READ_OPERATIONS);
 
-const secretKey =
-  /(?:password|passwd|wstoken|privatetoken|accesstoken|refreshtoken|autologin|sesskey|secret|authorization|^token$|^hash$)/i;
+/** Field names (underscores and dashes removed) whose values are credentials. */
+export const SECRET_KEY =
+  /(?:password|passwd|wstoken|privatetoken|accesstoken|accesskey|refreshtoken|autologin|sesskey|secret|authorization|^token$|^hash$)/i;
 /** Bounded JSON, not an HTML rendering or instruction channel. */
 export function sanitizeApiResult(input: unknown, site: string) {
   let nodes = 0,
@@ -408,7 +409,7 @@ export function sanitizeApiResult(input: unknown, site: string) {
       truncated = true;
       return null;
     }
-    if (secretKey.test(key.replace(/[_-]/g, ""))) {
+    if (SECRET_KEY.test(key.replace(/[_-]/g, ""))) {
       redacted++;
       return "[redacted]";
     }
@@ -444,7 +445,7 @@ export function sanitizeApiResult(input: unknown, site: string) {
       const o = v as Record<string, unknown>;
       if (
         typeof o.name === "string" &&
-        secretKey.test(o.name.replace(/[_-]/g, "")) &&
+        SECRET_KEY.test(o.name.replace(/[_-]/g, "")) &&
         Object.hasOwn(o, "value")
       ) {
         redacted++;
