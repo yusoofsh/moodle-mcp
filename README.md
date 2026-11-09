@@ -1,15 +1,50 @@
 # Moodle MCP — student reads, document text and API coverage
 
-Version **0.10.1** provides **31 high-level read-only MCP tools**, a restricted
-registry of reviewed Moodle Web Service adapters, and authenticated remote access
-on Cloudflare Workers or a Node/OCI server. This MIT-licensed fork of
+Version **0.11.0** provides **31 high-level read-only MCP tools**, a restricted
+registry of reviewed Moodle Web Service adapters, an **opt-in read/write tool**
+(`moodle_call_api`) for any function the Moodle token advertises, and authenticated
+remote access on Cloudflare Workers or a Node/OCI server. This MIT-licensed fork of
 [1alexandrer/moodle-mcp](https://github.com/1alexandrer/moodle-mcp) targets a single
 student account without requiring a Moodle administrator or an installed plugin.
 
 **Scope is explicit:** an advertised API is not proof of permission or implemented
-workflow coverage. Writes, activity views with side effects, attendance marking,
-active quiz operations and unreviewed functions are not exposed by the read API.
+workflow coverage. The read tools never write. Writes, activity views with side
+effects, attendance marking and active quiz operations are reachable only through
+`moodle_call_api`, which the owner must approve per connection (below).
 See [SiberMu coverage and validation](docs/SIBERMU-COVERAGE.md).
+
+## Read-only or read/write
+
+The authorization page asks the owner what a connecting app may do. Read access is
+always included. **Also allow changes** is unchecked by default; ticking it grants
+the `moodle:write` scope, which unlocks `moodle_call_api`.
+
+```jsonc
+// moodle_call_api arguments: any advertised function, nested JSON allowed
+{
+  "functionName": "mod_forum_add_discussion_post",
+  "parameters": {
+    "postid": 123,
+    "subject": "Re: Week 3",
+    "message": "<p>Thanks!</p>",
+  },
+}
+```
+
+- Moodle still enforces the account's own permissions; the tool adds none.
+- Credential-issuing functions (autologin keys, QR-login and calendar export tokens,
+  and the batch wrapper that could bypass them) are blocked, and the Moodle token is
+  scrubbed from every result.
+- The tool is marked destructive so clients can confirm each call. Use
+  `moodle_get_api_coverage` to list the functions your token allows.
+- Connections made before 0.11.0, and ones where the box was left unticked, stay
+  read-only. To upgrade, remove the connector and add it again, then tick the box.
+  Clients must request `moodle:write`; it is listed in `scopes_supported`.
+- File submissions: upload small base64 chunks with `core_files_upload`, then pass the
+  draft item ID to the submission function. MCP request bodies are capped at 1 MB, and
+  the separate `/webservice/upload.php` endpoint is not used.
+- stdio has no consent screen, so `moodle_call_api` is off unless
+  `MOODLE_MCP_ALLOW_WRITE=1` is set.
 
 ## Main capabilities
 

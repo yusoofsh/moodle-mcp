@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "moodle-mcp",
   "display_name": "Moodle MCP",
-  "version": "0.10.5",
+  "version": "0.11.0",
   "description": "Give Claude access to your Moodle courses, assignments, grades, quizzes, calendar, forums, and notifications.",
   "long_description": "Moodle MCP connects Claude to any Moodle LMS instance. Ask about upcoming deadlines, check your grades, browse course resources, read assignment feedback, and more — all in natural language.\n\nSupports token-based auth (recommended) or username/password login.",
   "author": {
@@ -196,6 +196,10 @@
     {
       "name": "moodle_get_site_info",
       "description": "Read Moodle site/current account information and the backend tool catalog with required/optional Web Service advertisement. Includes completion and Attendance API diagnostics. Advertised is not proof of role/context authorization; a connector may cache an older catalog. Never returns tokens."
+    },
+    {
+      "name": "moodle_call_api",
+      "description": "Call ANY Moodle Web Service function the connected token advertises, including functions that change data: submit or save assignments, post to forums, send messages, update the profile, manage enrolments and more. Requires the moodle:write permission granted on the authorization page. Moodle still enforces the account's own roles. Pass functionName and a JSON parameters object using the function's documented field names; nested objects and lists are sent in Moodle's array format. Use moodle_get_api_coverage to list available functions and moodle_read_api for reviewed read-only access. Changes are real and often irreversible: confirm intent first, read the current state, then check the result. Functions that issue credentials are blocked. File content must be uploaded in small base64 pieces (core_files_upload), then referenced by draft item ID."
     }
   ],
   "compatibility": {

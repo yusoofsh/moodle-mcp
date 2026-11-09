@@ -47,6 +47,7 @@ export const TOOL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_get_attendance: ["core_course_get_contents"],
   moodle_get_notifications: ["message_popup_get_popup_notifications"],
   moodle_read_api: [],
+  moodle_call_api: [],
   moodle_get_api_coverage: [],
   moodle_get_tasks: ["core_course_get_contents"],
   moodle_search_materials: ["core_course_get_contents"],
@@ -55,7 +56,7 @@ export const TOOL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_get_assignment_details: ["core_course_get_contents"],
   moodle_get_grades_overview: [],
 };
-export const TOOL_CATALOG_VERSION = "0.10.5";
+export const TOOL_CATALOG_VERSION = "0.11.0";
 export const TOOL_OPTIONAL_FUNCTIONS: Record<string, readonly string[]> = {
   moodle_get_resource: ["core_course_get_course_module"],
   moodle_get_forum_thread: [

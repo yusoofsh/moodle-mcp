@@ -29,7 +29,7 @@ export function createProvider(config: HttpConfig, store: AuthStore): Provider {
       short: { secure: config.secure, sameSite: "lax" },
     },
     clients: [],
-    scopes: ["openid", "offline_access", "moodle:read"],
+    scopes: ["openid", "offline_access", "moodle:read", "moodle:write"],
     claims: { openid: ["sub"] },
     responseTypes: ["code"],
     subjectTypes: ["public"],
@@ -51,7 +51,7 @@ export function createProvider(config: HttpConfig, store: AuthStore): Provider {
           if (indicator !== resource)
             throw new errors.InvalidTarget("Unknown MCP resource");
           return {
-            scope: "moodle:read",
+            scope: "moodle:read moodle:write",
             audience: resource,
             accessTokenTTL: 900,
             accessTokenFormat: "opaque",

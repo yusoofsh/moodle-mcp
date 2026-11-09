@@ -1,6 +1,15 @@
 # Security model
 
-This is a **single-owner read-only bridge**, not a public multi-tenant Moodle service. The password-authenticated owner (or explicitly selected allowlisted GitHub owner) authorizes MCP clients to use one Moodle account configured on the server.
+This is a **single-owner bridge**, not a public multi-tenant Moodle service. The password-authenticated owner (or explicitly selected allowlisted GitHub owner) authorizes MCP clients to use one Moodle account configured on the server.
+
+## Access tiers
+
+- **Read** (`moodle:read`) is the default and covers the reviewed read tools. A client that asks only for this scope is shown a read-only consent page.
+- **Write** (`moodle:write`) unlocks `moodle_call_api`, which calls any Web Service function the Moodle token advertises, including functions that change data. It is granted only when the owner ticks **Also allow changes** on the consent page, which is unchecked by default. Declining leaves a normal read-only connection.
+- The tool checks the token's scope on every call and fails closed. Existing connections keep read-only access until the owner reconnects and ticks the box. Moodle still enforces the account's own roles; the tool adds no privileges of its own.
+- Functions that issue or reveal a Moodle credential (autologin keys, QR-login tokens, calendar export tokens, batch wrappers that could bypass the list) are always blocked. Results are scrubbed of the Moodle token.
+- The tool is annotated as destructive and non-idempotent so MCP clients can ask for confirmation per call. Over stdio there is no consent screen, so the tool is off unless `MOODLE_MCP_ALLOW_WRITE=1` is set.
+- Prefer a token with the fewest Moodle capabilities you need: write access can do whatever that token can do.
 
 ## Deployment requirements
 
@@ -8,7 +17,7 @@ This is a **single-owner read-only bridge**, not a public multi-tenant Moodle se
 - Set `TRUST_PROXY_HOPS` to the actual bounded proxy count. Strip untrusted forwarding headers at the edge; do not deploy behind an arbitrary public HTTP forwarder.
 - Generate `AUTH_SECRET` using a cryptographically secure generator. Keep `.env` readable only by its operator, outside Git and image layers.
 - Retain both the secret and the persistent `/data` volume across restarts. Encrypted database backups require the same secret; protect and back up them separately.
-- Use your own least-privileged Moodle web-service token. Do not use a Moodle administrator token for student access. The server's read-only tools do not reduce the upstream token's privileges elsewhere.
+- Use your own least-privileged Moodle web-service token. Do not use a Moodle administrator token for student access. Neither tier reduces the upstream token's privileges elsewhere.
 - Run one application replica. The SQLite adapter and in-process rate limits are not a distributed deployment design.
 - Approve only known MCP clients. Dynamic registration is public by design; registration alone does not authorize Moodle access. Inspect the client ID and exact redirect URI on the consent screen.
 

@@ -50,6 +50,11 @@ export class MoodleClient {
     return this.baseUrl;
   }
 
+  /** Masks the Moodle credential in text that is about to leave this process. */
+  redact(text: string): string {
+    return text.split(this.token).join("[REDACTED]");
+  }
+
   /** Returns true if the WS function is available on this Moodle server. */
   supports(wsfunction: string): boolean {
     return this.supportedFunctions.has(wsfunction);

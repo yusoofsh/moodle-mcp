@@ -8,22 +8,16 @@ import {
 } from "node:crypto";
 import type Provider from "oidc-provider";
 import helmet from "helmet";
+import { WRITE_SCOPE } from "../write-api.js";
 import { consentCallbackOrigin } from "./consent-policy.js";
 import type { HttpConfig } from "./config.js";
 import type { SqlAuthStore as AuthStore } from "./sql-store.js";
 import { acquirePasswordSlot } from "./password-slot.js";
 import { verifyPassword } from "./password.js";
 import { reservePasswordAttempt } from "./password-throttle.js";
+import { consentPage, passwordPage } from "./pages.js";
 
 export type Fetcher = typeof fetch;
-const escape = (text: unknown): string =>
-  String(text).replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
-      ]!,
-  );
 function equal(a: unknown, b: string): boolean {
   if (typeof a !== "string") return false;
   const actual = Buffer.from(a),
@@ -36,6 +30,18 @@ function cookie(req: Request, name: string): string | undefined {
     .map((s) => s.trim())
     .find((s) => s.startsWith(name + "="))
     ?.slice(name.length + 1);
+}
+/** A grant that once declined a scope must be able to accept it later. */
+function clearRejectedScope(
+  grant: { rejected?: { resources?: Record<string, string> } },
+  resource: string,
+  scope: string,
+): void {
+  const resources = grant.rejected?.resources;
+  if (!resources?.[resource]) return;
+  const rest = resources[resource].split(" ").filter((s) => s !== scope);
+  if (rest.length) resources[resource] = rest.join(" ");
+  else delete resources[resource];
 }
 export function interactionRouter(
   provider: Provider,
@@ -58,7 +64,7 @@ export function interactionRouter(
   const passwordForm = (uid: string, invalid = false): string => {
     const nonce = Buffer.from(randomBytes(32)).toString("base64url");
     store.put("PasswordForm", nonce, { uid }, 600);
-    return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Sign in to Moodle MCP</title><body><main><h1>Sign in to Moodle MCP</h1><p>Enter this server's owner password. This is not your Moodle password.</p>${invalid ? '<p role="alert">Incorrect password. Try again.</p>' : ""}<form method="post" action="/interaction/password"><input type="hidden" name="csrf" value="${nonce}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="1024"><button type="submit">Continue</button></form><p>You will review access permissions before authorizing the MCP client.</p></main></body></html>`;
+    return passwordPage(nonce, invalid);
   };
   const csrf = (uid: string): string =>
     createHmac("sha256", config.authSecret)
@@ -116,11 +122,21 @@ export function interactionRouter(
       directives: { formAction: ["'self'", callbackOrigin] },
     })(req, res, () => {});
     res.setHeader("Cache-Control", "no-store");
-    res
-      .type("html")
-      .send(
-        `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Authorize Moodle MCP</title><body><main><h1>Authorize Moodle MCP</h1><p><strong>${escape(client?.clientName || client?.clientId || "MCP client")}</strong> requests read-only access to your configured Moodle account.</p><p>This includes courses, files, assignments, grades, calendar, quizzes, forums and notifications. It cannot submit work or change grades.</p><p>Client ID: <code>${escape(client?.clientId)}</code></p><p>Redirect URI: <code>${escape(details.params.redirect_uri)}</code></p><form method="post" action="/interaction/confirm"><input type="hidden" name="csrf" value="${csrf(details.uid)}"><button name="decision" value="allow">Allow read-only access</button><button name="decision" value="deny">Deny</button></form></main></body></html>`,
-      );
+    const requested =
+      (
+        details.prompt.details as {
+          missingResourceScopes?: Record<string, string[]>;
+        }
+      ).missingResourceScopes?.[`${config.publicUrl}/mcp`] ?? [];
+    res.type("html").send(
+      consentPage({
+        clientName: client?.clientName || client?.clientId || "MCP client",
+        clientId: String(client?.clientId ?? ""),
+        redirectUri: String(details.params.redirect_uri),
+        csrf: csrf(details.uid),
+        offersWrite: requested.includes(WRITE_SCOPE),
+      }),
+    );
   });
   router.post(
     "/interaction/password",
@@ -331,12 +347,22 @@ export function interactionRouter(
       )) {
         if (
           resource !== `${config.publicUrl}/mcp` ||
-          scopes.some((scope) => scope !== "moodle:read")
+          scopes.some((scope) => !["moodle:read", WRITE_SCOPE].includes(scope))
         ) {
           res.status(403).send("Invalid resource scope");
           return;
         }
-        grant.addResourceScope(resource, scopes.join(" "));
+        // Write is granted only by the owner's explicit tick. A declined scope is
+        // recorded as rejected so the consent prompt is not shown again in a loop.
+        const wantsWrite = req.body.write === "1";
+        const granted = scopes.filter(
+          (scope) => scope !== WRITE_SCOPE || wantsWrite,
+        );
+        if (granted.length) grant.addResourceScope(resource, granted.join(" "));
+        if (scopes.includes(WRITE_SCOPE)) {
+          if (wantsWrite) clearRejectedScope(grant, resource, WRITE_SCOPE);
+          else grant.rejectResourceScope(resource, WRITE_SCOPE);
+        }
       }
       const grantId = await grant.save();
       await provider.interactionFinished(
