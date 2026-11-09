@@ -36,7 +36,8 @@
         "MOODLE_URL": "${user_config.moodle_url}",
         "MOODLE_TOKEN": "${user_config.moodle_token}",
         "MOODLE_USERNAME": "${user_config.moodle_username}",
-        "MOODLE_PASSWORD": "${user_config.moodle_password}"
+        "MOODLE_PASSWORD": "${user_config.moodle_password}",
+        "MOODLE_MCP_ALLOW_WRITE": "${user_config.allow_write}"
       }
     }
   },
@@ -65,6 +66,13 @@
       "title": "Moodle Password",
       "description": "Your Moodle login password. Only needed if not using an API token.",
       "sensitive": true,
+      "required": false
+    },
+    "allow_write": {
+      "type": "boolean",
+      "title": "Allow changes (read & write)",
+      "description": "Turns on moodle_call_api, which can change data in Moodle (submit work, post, send messages) within your account's permissions. Off keeps Claude read-only.",
+      "default": false,
       "required": false
     }
   },

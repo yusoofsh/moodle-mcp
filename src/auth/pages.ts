@@ -69,6 +69,8 @@ export interface ConsentView {
   clientName: string;
   clientId: string;
   redirectUri: string;
+  /** Host the browser returns to after approval; shown up front because the app name is self-declared. */
+  returnsTo: string;
   csrf: string;
   /** True when the client asked for the write scope. Otherwise only read access exists to grant. */
   offersWrite: boolean;
@@ -81,6 +83,6 @@ export function consentPage(view: ConsentView): string {
   return layout(
     "Authorize Moodle MCP",
     2,
-    `<h1>Authorize Moodle MCP</h1><p class="lead">You are signed in as the server owner.</p><div class="client"><span class="note">Connecting app</span><br><strong>${escapeHtml(view.clientName)}</strong></div><h2>Always included: read access</h2><ul class="perm"><li>Courses, files and course content</li><li>Assignments, grades and quiz results</li><li>Calendar, forums and notifications</li></ul><form method="post" action="/interaction/confirm"><input type="hidden" name="csrf" value="${escapeHtml(view.csrf)}">${write}<div class="actions row"><button class="primary" name="decision" value="allow">${view.offersWrite ? "Allow access" : "Allow read-only access"}</button><button name="decision" value="deny">Deny</button></div></form><p class="note">${view.offersWrite ? "You can disconnect this app at any time by removing the connector." : "This app asked for read access only. It cannot submit work or change grades."}</p><details><summary>Technical details</summary><p>Client ID<code>${escapeHtml(view.clientId)}</code></p><p>Redirect URI<code>${escapeHtml(view.redirectUri)}</code></p></details>`,
+    `<h1>Authorize Moodle MCP</h1><p class="lead">You are signed in as the server owner.</p><div class="client"><span class="note">Connecting app</span><br><strong>${escapeHtml(view.clientName)}</strong><br><span class="note">Returns to <b>${escapeHtml(view.returnsTo)}</b>. The name is chosen by the app; check this address.</span></div><h2>Always included: read access</h2><ul class="perm"><li>Courses, files and course content</li><li>Assignments, grades and quiz results</li><li>Calendar, forums and notifications</li></ul><form method="post" action="/interaction/confirm"><input type="hidden" name="csrf" value="${escapeHtml(view.csrf)}">${write}<div class="actions row"><button class="primary" name="decision" value="allow">${view.offersWrite ? "Allow access" : "Allow read-only access"}</button><button name="decision" value="deny">Deny</button></div></form><p class="note">${view.offersWrite ? "You can disconnect this app at any time by removing the connector." : "This app asked for read access only. It cannot submit work or change grades."}</p><details><summary>Technical details</summary><p>Client ID<code>${escapeHtml(view.clientId)}</code></p><p>Redirect URI<code>${escapeHtml(view.redirectUri)}</code></p></details>`,
   );
 }

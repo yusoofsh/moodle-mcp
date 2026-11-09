@@ -38,8 +38,10 @@ the `moodle:write` scope, which unlocks `moodle_call_api`.
 - The tool is marked destructive so clients can confirm each call. Use
   `moodle_get_api_coverage` to list the functions your token allows.
 - Connections made before 0.11.0, and ones where the box was left unticked, stay
-  read-only. To upgrade, remove the connector and add it again, then tick the box.
-  Clients must request `moodle:write`; it is listed in `scopes_supported`.
+  read-only. Moodle remembers the answer for that app while your sign-in session
+  lasts (24 hours), so to upgrade remove the connector and add it again from a new
+  or private browser window, then tick the box. Clients must request
+  `moodle:write`; it is listed in `scopes_supported`.
 - File submissions: upload small base64 chunks with `core_files_upload`, then pass the
   draft item ID to the submission function. MCP request bodies are capped at 1 MB, and
   the separate `/webservice/upload.php` endpoint is not used.

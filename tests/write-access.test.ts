@@ -131,46 +131,45 @@ const password = "a private Moodle passphrase",
   callback = "https://chatgpt.com/connector_platform_oauth_redirect";
 let passwordHash: string;
 let runtime: ReturnType<typeof createApp>;
+let config: ReturnType<typeof getHttpConfig>;
 let upstream: ReturnType<typeof vi.fn>;
 beforeAll(async () => {
   passwordHash = await hashPassword(password);
 });
 beforeEach(() => {
   upstream = vi.fn();
-  runtime = createApp(
-    getHttpConfig({
-      PUBLIC_URL: origin,
-      ALLOW_INSECURE_HTTP: "true",
-      AUTH_PASSWORD_HASH: passwordHash,
-      AUTH_SECRET: "a".repeat(64),
-      OAUTH_DATABASE_PATH: ":memory:",
-    }),
-    {
-      createMoodleClient: async () => {
-        const original = globalThis.fetch;
-        globalThis.fetch = vi.fn().mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              userid: 42,
-              sitename: "Test",
-              functions: [{ name: "mod_forum_add_post", version: "1" }],
-            }),
-          ),
-        );
-        try {
-          const client = await MoodleClient.create({
-            baseUrl: "https://school.example",
-            token: secret,
-            maxFileBytes: 1024,
-          });
-          vi.spyOn(client, "call").mockImplementation(upstream as never);
-          return client;
-        } finally {
-          globalThis.fetch = original;
-        }
-      },
+  config = getHttpConfig({
+    PUBLIC_URL: origin,
+    ALLOW_INSECURE_HTTP: "true",
+    AUTH_PASSWORD_HASH: passwordHash,
+    AUTH_SECRET: "a".repeat(64),
+    OAUTH_DATABASE_PATH: ":memory:",
+  });
+  runtime = createApp(config, {
+    createMoodleClient: async () => {
+      const original = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            userid: 42,
+            sitename: "Test",
+            functions: [{ name: "mod_forum_add_post", version: "1" }],
+          }),
+        ),
+      );
+      try {
+        const client = await MoodleClient.create({
+          baseUrl: "https://school.example",
+          token: secret,
+          maxFileBytes: 1024,
+        });
+        vi.spyOn(client, "call").mockImplementation(upstream as never);
+        return client;
+      } finally {
+        globalThis.fetch = original;
+      }
     },
-  );
+  });
 });
 afterEach(() => runtime.close());
 
@@ -283,6 +282,7 @@ describe("two-tier OAuth consent", () => {
     const id2 = await register();
     const full = await reachConsent(id2, both);
     expect(full.page).toContain("Study Assistant");
+    expect(full.page).toMatch(/Returns to <b>chatgpt\.com<\/b>/);
     expect(full.page).toContain('name="write"');
     expect(full.page).not.toMatch(/name="write"[^>]*checked/);
   });
@@ -308,6 +308,92 @@ describe("two-tier OAuth consent", () => {
     const flow = await reachConsent(id, "openid offline_access moodle:read");
     const token = await approve(flow, id, { decision: "allow", write: "1" });
     expect(token.body.scope.split(" ")).not.toContain("moodle:write");
+  });
+});
+
+describe("declined write access", () => {
+  it("is not re-offered to a live session, and a fresh session can upgrade", async () => {
+    const id = await register();
+    const first = await reachConsent(id, both);
+    const readOnly = await approve(first, id, { decision: "allow" });
+    expect(readOnly.body.scope.split(" ")).not.toContain("moodle:write");
+    // Same browser session: Moodle's grant already answered the write question.
+    const again = await first.agent
+      .get("/oauth/authorize")
+      .set("Host", host)
+      .query({
+        client_id: id,
+        redirect_uri: callback,
+        response_type: "code",
+        scope: both,
+        resource: origin + "/mcp",
+        state: "s",
+        code_challenge: createHash("sha256").update("v").digest("base64url"),
+        code_challenge_method: "S256",
+      });
+    expect(new URL(again.headers.location, origin).pathname).not.toBe(
+      "/interaction",
+    );
+    // A new browser session is asked again and can now grant write.
+    const fresh = await reachConsent(id, both);
+    expect(fresh.page).toContain('name="write"');
+    const upgraded = await approve(fresh, id, {
+      decision: "allow",
+      write: "1",
+    });
+    expect(upgraded.body.scope.split(" ")).toContain("moodle:write");
+  });
+});
+
+describe("pages and bearer verification", () => {
+  const authorizeQuery = (id: string) => ({
+    client_id: id,
+    redirect_uri: callback,
+    response_type: "code",
+    scope: both,
+    resource: origin + "/mcp",
+    state: "s",
+    code_challenge: createHash("sha256").update("v").digest("base64url"),
+    code_challenge_method: "S256",
+  });
+  it("keeps inline styles allowed by the CSP on the login and consent pages", async () => {
+    const id = await register();
+    const agent = request.agent(runtime.app);
+    const start = await agent
+      .get("/oauth/authorize")
+      .set("Host", host)
+      .query(authorizeQuery(id));
+    const login = await agent
+      .get(path(start.headers.location))
+      .set("Host", host);
+    expect(login.headers["content-security-policy"]).toMatch(
+      /style-src[^;]*'unsafe-inline'/,
+    );
+    expect(login.text).toContain("<style>");
+    const flow = await reachConsent(id, both);
+    const consent = await flow.agent.get("/interaction").set("Host", host);
+    expect(consent.headers["content-security-policy"]).toMatch(
+      /style-src[^;]*'unsafe-inline'/,
+    );
+    expect(consent.text).toContain("<style>");
+  });
+  it("rejects a token that lacks moodle:read with 403", async () => {
+    const id = await register();
+    const grant = new runtime.provider.Grant({
+      accountId: config.ownerId,
+      clientId: id,
+    });
+    grant.addResourceScope(origin + "/mcp", "moodle:write");
+    const token = new runtime.provider.AccessToken({
+      accountId: config.ownerId,
+      clientId: id,
+      grantId: await grant.save(),
+      scope: "moodle:write",
+      aud: origin + "/mcp",
+    });
+    const response = await rpc(await token.save(), "tools/list", {});
+    expect(response.status).toBe(403);
+    expect(upstream).not.toHaveBeenCalled();
   });
 });
 

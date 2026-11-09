@@ -105,7 +105,7 @@ export async function invokeWriteOperation(
           .slice(0, 500)}`,
       );
     throw new Error(
-      `Moodle could not run ${functionName}. The change may not have been applied; check before retrying.`,
+      `Moodle could not run ${functionName}. The change may already have been applied; read the current state before retrying.`,
     );
   }
   const json = client.redact(JSON.stringify(raw ?? null));

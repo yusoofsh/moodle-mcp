@@ -31,18 +31,6 @@ function cookie(req: Request, name: string): string | undefined {
     .find((s) => s.startsWith(name + "="))
     ?.slice(name.length + 1);
 }
-/** A grant that once declined a scope must be able to accept it later. */
-function clearRejectedScope(
-  grant: { rejected?: { resources?: Record<string, string> } },
-  resource: string,
-  scope: string,
-): void {
-  const resources = grant.rejected?.resources;
-  if (!resources?.[resource]) return;
-  const rest = resources[resource].split(" ").filter((s) => s !== scope);
-  if (rest.length) resources[resource] = rest.join(" ");
-  else delete resources[resource];
-}
 export function interactionRouter(
   provider: Provider,
   config: HttpConfig,
@@ -133,6 +121,7 @@ export function interactionRouter(
         clientName: client?.clientName || client?.clientId || "MCP client",
         clientId: String(client?.clientId ?? ""),
         redirectUri: String(details.params.redirect_uri),
+        returnsTo: new URL(callbackOrigin).host,
         csrf: csrf(details.uid),
         offersWrite: requested.includes(WRITE_SCOPE),
       }),
@@ -359,10 +348,8 @@ export function interactionRouter(
           (scope) => scope !== WRITE_SCOPE || wantsWrite,
         );
         if (granted.length) grant.addResourceScope(resource, granted.join(" "));
-        if (scopes.includes(WRITE_SCOPE)) {
-          if (wantsWrite) clearRejectedScope(grant, resource, WRITE_SCOPE);
-          else grant.rejectResourceScope(resource, WRITE_SCOPE);
-        }
+        if (scopes.includes(WRITE_SCOPE) && !wantsWrite)
+          grant.rejectResourceScope(resource, WRITE_SCOPE);
       }
       const grantId = await grant.save();
       await provider.interactionFinished(

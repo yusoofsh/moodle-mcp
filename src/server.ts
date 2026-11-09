@@ -64,7 +64,9 @@ async function main() {
     server,
     client,
     undefined,
-    process.env.MOODLE_MCP_ALLOW_WRITE === "1" ? "local" : "disabled",
+    ["1", "true"].includes(process.env.MOODLE_MCP_ALLOW_WRITE ?? "")
+      ? "local"
+      : "disabled",
   );
   registerResources(server, client);
   registerPrompts(server);
