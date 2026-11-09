@@ -89,10 +89,15 @@ describe("authenticated HTTP discovery during Moodle outage", () => {
       expect(tool).not.toHaveProperty("execution");
       expect(tool.inputSchema.type).toBe("object");
       expect(tool.annotations.readOnlyHint).toBe(
-        tool.name !== "moodle_settings_update",
+        !["moodle_settings_update", "moodle_call_api"].includes(tool.name),
       );
       expect(tool._meta.securitySchemes).toEqual([
-        { type: "oauth2", scopes: ["moodle:read"] },
+        {
+          type: "oauth2",
+          scopes: [
+            tool.name === "moodle_call_api" ? "moodle:write" : "moodle:read",
+          ],
+        },
       ]);
     }
     expect(factory).not.toHaveBeenCalled();

@@ -9,7 +9,7 @@ import { registerPrompts } from "./prompts/index.js";
 
 if (process.stdin.isTTY && !process.env.MOODLE_URL) {
   console.log(`
-moodle-mcp v0.10.5 — Moodle MCP Server
+moodle-mcp v0.11.0 — Moodle MCP Server
 
 This tool runs as a background server for Claude — you don't run it directly.
 Add it to your Claude config and restart Claude.
@@ -56,10 +56,18 @@ async function main() {
 
   const server = new McpServer({
     name: "moodle-mcp",
-    version: "0.10.5",
+    version: "0.11.0",
   });
 
-  registerAllTools(server, client);
+  // Changing data over stdio is opt-in: there is no OAuth consent screen here.
+  registerAllTools(
+    server,
+    client,
+    undefined,
+    ["1", "true"].includes(process.env.MOODLE_MCP_ALLOW_WRITE ?? "")
+      ? "local"
+      : "disabled",
+  );
   registerResources(server, client);
   registerPrompts(server);
 

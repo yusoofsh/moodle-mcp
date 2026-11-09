@@ -74,7 +74,7 @@ describe("explicit API allowlist", () => {
     expect(
       r.data.entries.find((x) => x.name === "mod_assign_save_submission")
         ?.route,
-    ).toBe("not_exposed");
+    ).toBe("write_passthrough");
   });
   it.each(Object.keys(READ_OPERATIONS))(
     "does not knowingly expose an upstream-declared write: %s",

@@ -21,10 +21,12 @@ import { registerQuizTools } from "./tools/quizzes.js";
 import { registerForumTools } from "./tools/forums.js";
 import { registerNotificationTools } from "./tools/notifications.js";
 import { registerSiteInfoTool } from "./tools/siteinfo.js";
+import { registerWriteTools, type WriteAccess } from "./tools/write.js";
 export function registerAllTools(
   server: McpServer,
   client: MoodleClientSource,
   preferences?: StudyPreferenceStore,
+  writeAccess: WriteAccess = "oauth",
 ): void {
   registerWorkflowMethods(server);
   if (preferences) registerStudySettings(server, preferences);
@@ -44,4 +46,5 @@ export function registerAllTools(
   registerCoverageTools(server, client);
   registerQuizReviewTools(server, client);
   registerSiteInfoTool(server, client);
+  registerWriteTools(server, client, writeAccess);
 }

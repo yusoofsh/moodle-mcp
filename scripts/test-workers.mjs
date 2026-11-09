@@ -820,7 +820,7 @@ try {
         tools.json.result.tools.every(
           (tool) =>
             tool.annotations.readOnlyHint ===
-            (tool.name !== "moodle_settings_update"),
+            !["moodle_settings_update", "moodle_call_api"].includes(tool.name),
         ),
       );
       const result = await rpc(granted.access_token, "tools/call", {
@@ -1248,7 +1248,12 @@ try {
         );
         assert.equal(tool.inputSchema.type, "object");
         assert.deepEqual(tool._meta.securitySchemes, [
-          { type: "oauth2", scopes: ["moodle:read"] },
+          {
+            type: "oauth2",
+            scopes: [
+              tool.name === "moodle_call_api" ? "moodle:write" : "moodle:read",
+            ],
+          },
         ]);
       }
       assert.equal(calls, before, "Discovery must not fetch the Moodle API");

@@ -1,3 +1,11 @@
+# 0.11.0 — Read/write access and a refreshed sign-in
+
+- Add the `moodle:write` OAuth scope and `moodle_call_api`, which calls any Web Service function the Moodle token advertises. The owner opts in per connection with an unchecked-by-default box on the consent page; read-only stays the default. Credential-issuing functions are blocked.
+- Redesign the password and consent pages: shared layout, light/dark themes, phone-width layout, visible focus, the connecting app's name up front and technical details collapsed.
+- The 401 challenge no longer names a scope, so clients request every supported scope and the owner chooses. Tokens without `moodle:read` are rejected with 403.
+- stdio: `moodle_call_api` is registered only when `MOODLE_MCP_ALLOW_WRITE=1`.
+- `moodle_get_api_coverage` reports `write_passthrough` routes and `blockedCount` separately from reviewed routes.
+
 # 0.5.0 — Cloudflare Workers Free
 
 - Add SQLite Durable Object deployment retaining password OAuth and curated tools.
@@ -19,6 +27,7 @@
 ### Added
 
 **Tools (13 total)**
+
 - `moodle_get_site_info` — school name, Moodle version, enabled API status
 - `moodle_list_courses` — all enrolled courses
 - `moodle_get_course` — sections and activities
@@ -34,11 +43,13 @@
 - `moodle_get_notifications` — recent notifications with unread indicator
 
 **MCP Resources**
+
 - Course files exposed as MCP resources at `moodle://courses/{courseId}/files/{encodedUrl}`
 - PDFs and text files readable directly by Claude
 - Enables AI-powered document synthesis
 
 **MCP Prompts**
+
 - `summarize-course` — structured course summary
 - `whats-due` — prioritized upcoming deadlines
 - `build-study-notes` — builds a linked Obsidian vault from course materials
@@ -46,6 +57,7 @@
 - `search-notes` — natural language search across course files
 
 **Infrastructure**
+
 - Token auth + username/password auth
 - Graceful degradation: tools return helpful messages instead of crashing when a school's Moodle doesn't expose an API
 - `supports()` helper on `MoodleClient` for capability detection

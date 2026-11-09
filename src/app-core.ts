@@ -86,7 +86,7 @@ export function createAppWithStore(
   const metadata = {
     resource,
     authorization_servers: [config.publicUrl],
-    scopes_supported: ["moodle:read"],
+    scopes_supported: ["moodle:read", "moodle:write"],
     bearer_methods_supported: ["header"],
     resource_name: "Moodle MCP",
   };
@@ -104,7 +104,10 @@ export function createAppWithStore(
   app.use(interactionRouter(provider, config, store, dependencies.githubFetch));
   const authenticate = requireBearerAuth({
     resourceMetadataUrl: metadataUrl,
-    requiredScopes: ["moodle:read"],
+    // No scope in the 401 challenge: clients then request every supported scope
+    // and the owner picks read-only or read/write on the consent page.
+    // Read access is enforced by the verifier below.
+    requiredScopes: [],
     verifier: {
       verifyAccessToken: async (token) => {
         const access = await provider.AccessToken.find(token);
@@ -118,10 +121,13 @@ export function createAppWithStore(
           !(await provider.Grant.find(access.grantId))
         )
           throw new OAuthError("invalid_token", "Invalid access token");
+        const scopes = (access.scope || "").split(" ");
+        if (!scopes.includes("moodle:read"))
+          throw new OAuthError("insufficient_scope", "Insufficient scope");
         return {
           token,
           clientId: access.clientId,
-          scopes: (access.scope || "").split(" "),
+          scopes,
           expiresAt: access.exp,
           resource: new URL(resource),
         };
@@ -218,7 +224,7 @@ export function createAppWithStore(
       }
       return;
     }
-    const server = new McpServer({ name: "moodle-mcp", version: "0.10.5" });
+    const server = new McpServer({ name: "moodle-mcp", version: "0.11.0" });
     registerAllTools(
       server,
       getClient,

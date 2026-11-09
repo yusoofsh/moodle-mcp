@@ -62,9 +62,11 @@ describe("MCP discovery is independent from Moodle availability", () => {
     expect(create).not.toHaveBeenCalled();
     for (const tool of result.tools) {
       expect(tool.inputSchema.type).toBe("object");
-      expect(tool.annotations?.readOnlyHint).toBe(true);
+      const writes = tool.name === "moodle_call_api";
+      expect(tool.annotations?.readOnlyHint).toBe(!writes);
+      expect(tool.annotations?.destructiveHint).toBe(writes);
       expect(tool._meta?.securitySchemes).toEqual([
-        { type: "oauth2", scopes: ["moodle:read"] },
+        { type: "oauth2", scopes: [writes ? "moodle:write" : "moodle:read"] },
       ]);
       expect(JSON.parse(JSON.stringify(tool))).not.toHaveProperty("execution");
     }

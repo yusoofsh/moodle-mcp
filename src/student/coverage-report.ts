@@ -7,6 +7,7 @@ import {
 } from "../tool-policy.js";
 import { READ_OPERATIONS } from "./safe-api.js";
 import { packet } from "./result.js";
+import { BLOCKED_WRITE_FUNCTIONS } from "../write-api.js";
 import {
   MOODLE_DECLARATIONS,
   SOURCE_REVISION,
@@ -28,7 +29,14 @@ export function apiCoverage(
     names = [...client.supportedFunctions].sort();
   const highLevel = new Set<string>(["core_webservice_get_site_info"]);
   for (const [tool, required] of Object.entries(TOOL_FUNCTIONS)) {
-    if (["moodle_read_api", "moodle_get_api_coverage"].includes(tool)) continue;
+    if (
+      [
+        "moodle_read_api",
+        "moodle_get_api_coverage",
+        "moodle_call_api",
+      ].includes(tool)
+    )
+      continue;
     for (const name of [...required, ...(TOOL_OPTIONAL_FUNCTIONS[tool] ?? [])])
       highLevel.add(name);
   }
@@ -40,11 +48,16 @@ export function apiCoverage(
       ? "high_level"
       : Object.hasOwn(READ_OPERATIONS, name)
         ? "read_adapter"
-        : "not_exposed",
+        : BLOCKED_WRITE_FUNCTIONS.has(name)
+          ? "not_exposed"
+          : "write_passthrough",
     permissionVerified: false,
     liveTested: false,
   }));
-  const supported = all.filter((r) => r.route !== "not_exposed").length,
+  // "Exposed" means a reviewed route. Raw write passthrough is counted separately.
+  const reviewed = (r: (typeof all)[number]) =>
+      r.route === "high_level" || r.route === "read_adapter",
+    supported = all.filter(reviewed).length,
     reads = all.filter((r) => r.declaredType === "read"),
     writes = all.filter((r) => r.declaredType === "write");
   const filtered = all.filter(
@@ -80,9 +93,12 @@ export function apiCoverage(
     declaredReadCount: reads.length,
     declaredWriteCount: writes.length,
     unknownDeclarationCount: all.length - reads.length - writes.length,
-    unexposedReadCount: reads.filter((r) => r.route === "not_exposed").length,
-    unexposedWriteCount: writes.filter((r) => r.route === "not_exposed").length,
-    unexposedCount: all.filter((r) => r.route === "not_exposed").length,
+    unexposedReadCount: reads.filter((r) => !reviewed(r)).length,
+    unexposedWriteCount: writes.filter((r) => !reviewed(r)).length,
+    unexposedCount: all.filter((r) => !reviewed(r)).length,
+    writePassthroughCount: all.filter((r) => r.route === "write_passthrough")
+      .length,
+    blockedCount: all.filter((r) => r.route === "not_exposed").length,
     entries: filtered.slice(offset, offset + limit),
     readOperations: operations,
     definitions: {
@@ -90,6 +106,12 @@ export function apiCoverage(
         "Function names reported by this token. 100% inventory is not 100% functionality.",
       functionRoutes:
         "At least one implemented invocation route, not every parameter/field or a complete end-user workflow.",
+      unexposed:
+        "No reviewed adapter. Such a function may still be callable through moodle_call_api when the owner approved read and write access.",
+      writePassthrough:
+        "Callable through moodle_call_api, only for connections the owner approved for read and write. Raw parameters; no per-function review or output sanitization.",
+      notExposed:
+        "Blocked because the function issues or reveals a Moodle credential.",
       declaredType:
         "Upstream declaration only; NOT a safety allowlist. Some get/view/mobile APIs can change state.",
       permission:

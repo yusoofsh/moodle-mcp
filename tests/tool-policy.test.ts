@@ -3,6 +3,7 @@ import { registerAllTools } from "../src/register-tools.js";
 import { registerResources } from "../src/resources/index.js";
 import { READ_ONLY, TOOL_FUNCTIONS, canRegister } from "../src/tool-policy.js";
 import { reauthorize } from "../src/tools/download.js";
+import { WRITE_TOOL } from "../src/tools/write.js";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { MoodleClient } from "../src/moodle-client.js";
 
@@ -21,7 +22,7 @@ describe("read-only tools and file access", () => {
         .sort(),
     );
   });
-  it("registers 21 tools with read-only and OAuth annotations", () => {
+  it("registers every tool read-only except the explicitly gated write tool", () => {
     const registerTool = vi.fn();
     registerAllTools(
       { registerTool } as unknown as McpServer,
@@ -30,7 +31,14 @@ describe("read-only tools and file access", () => {
     expect(registerTool).toHaveBeenCalledTimes(
       Object.keys(TOOL_FUNCTIONS).length,
     );
-    for (const [, options] of registerTool.mock.calls) {
+    for (const [name, options] of registerTool.mock.calls) {
+      if (name === "moodle_call_api") {
+        expect(options.annotations).toEqual(WRITE_TOOL);
+        expect(options._meta.securitySchemes[0].scopes).toEqual([
+          "moodle:write",
+        ]);
+        continue;
+      }
       expect(options.annotations).toEqual(READ_ONLY);
       expect(options._meta.securitySchemes[0].scopes).toEqual(["moodle:read"]);
     }
