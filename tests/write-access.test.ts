@@ -113,6 +113,23 @@ describe("invokeWriteOperation", () => {
     expect((error as Error).message).toMatch(/invalidparameter/);
     expect((error as Error).message).not.toContain(secret);
   });
+  it("redacts credential-named fields such as the private access key", async () => {
+    const info = vi.fn().mockResolvedValue({
+      userid: 5,
+      userprivateaccesskey: "k-123",
+      nested: [{ sesskey: "s-456", name: "kept" }],
+    });
+    const result = await invokeWriteOperation(
+      fakeClient(info),
+      "mod_forum_add_post",
+    );
+    expect(JSON.stringify(result)).not.toMatch(/k-123|s-456/);
+    expect(result.data.result).toMatchObject({
+      userid: 5,
+      userprivateaccesskey: "[redacted]",
+      nested: [{ sesskey: "[redacted]", name: "kept" }],
+    });
+  });
   it("returns a preview for very large results and warns that the call completed", async () => {
     const big = vi.fn().mockResolvedValue({ blob: "x".repeat(300_000) });
     const result = await invokeWriteOperation(
