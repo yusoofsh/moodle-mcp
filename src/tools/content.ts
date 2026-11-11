@@ -50,7 +50,7 @@ export function registerContentTools(
     server.registerTool(
       "moodle_get_dashboard",
       {
-        title: "Moodle Get Dashboard",
+        title: "Moodle",
         description:
           "Read a bounded student dashboard: a page of enrolled courses with visible-activity progress and a current-user action timeline. maxCourses defaults to 3, max 5; courseOffset pages the summaries. Calendar range/cursor is separate, may be partial, and is not the full personal/site calendar. Does not assume past opening events are missed deadlines or fetch each assignment submission. No writes or Attendance view handlers.",
         inputSchema: z
